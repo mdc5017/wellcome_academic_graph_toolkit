@@ -1,0 +1,168 @@
+<html>
+    <head>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+    <style type="text/css">
+        #mynetwork {
+            width: 100%;
+                 height: 1200px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+        }
+    </style>
+</head>
+
+
+    <body>
+        <label style="font-family:Helvetica">
+            Select year
+            <div class="slidecontainer">
+                <input type="range" min="2018" max="2023" value="2022" class="slider" id="slider">
+                Year: <span id="sliderValueDisplay"></span>
+            </div>
+        </label>
+        <br />
+        <br />
+        <label style="font-family:Helvetica">
+            Select publications
+            <div>
+                <label>
+                  <select id="nodeFilterSelect">
+                    <option value="All">All</option>
+                    <option value="Wellcome">Wellcome</option>
+                  </select>
+                </label>
+            </div>
+        </label>
+        <br />
+        <br />
+        <div class="card" style="width: 100%">
+
+
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+
+
+
+        <script type="module">
+
+            function htmlTitle(html) {
+            const container = document.createElement("div");
+            container.innerHTML = html;
+            return container;
+            }
+
+            const nodeFilterSelector = document.getElementById("nodeFilterSelect");
+
+            // Load nodes data
+            var response = await fetch('./nodes.json');
+            const nodesData = await response.json();
+
+            for (const [year, data] of Object.entries(nodesData)) {
+                for (let i = 0; i < data.length; i++) {
+                    const newTitle = htmlTitle(data[i].title)
+                    data[i].title = newTitle;
+                    };
+                };
+
+            // Load edges data
+            var response = await fetch('./edges.json');
+            const edgesData = await response.json();
+
+            // Load global options
+            var response = await fetch('./options.json');
+            var options = await response.json();
+
+            // Load node positions
+            var response = await fetch('./positions.json');
+            var positions = await response.json();
+
+            // create an array with nodes
+            if (Object.keys(positions).length > 0) {
+                for (const year in nodesData) {
+                    for (let i = 0; i < nodesData[year].length; i++) {
+                        console.log(nodesData[year][i].label);
+                        nodesData[year][i].x = positions[nodesData[year][i].label].x;
+                        nodesData[year][i].y = positions[nodesData[year][i].label].y;
+                    }
+                };
+                options.physics.enabled = false;
+            };
+
+            // Initialise an array with nodes
+            var nodes = new vis.DataSet(nodesData['2022']);
+
+            // create an array with edges
+            var edges = new vis.DataSet(edgesData);
+
+            // Create variable for sliderValue, set to initial value
+            // Update HTML slider and display with initial value
+            var sliderValue = 2022;
+            document.getElementById('slider').value = sliderValue;
+            document.getElementById('sliderValueDisplay').innerHTML = sliderValue;
+
+            // Create a DataView which is a filtered version of the DataSet
+            var edgesView = new vis.DataView(edges, {
+                filter: function(edge){
+                // Return true if the edge should be displayed
+                return (edge.year == sliderValue);
+            }
+            });
+
+            let nodeFilterValue = "All";
+
+            const nodesFilter = (node) => {
+                switch (nodeFilterValue) {
+                  case "All":
+                    return node.group === "All";
+                  case "Wellcome":
+                    return node.group === "Wellcome";
+                }
+              };
+
+            const nodesView = new vis.DataView(nodes, { filter: nodesFilter });
+
+            nodeFilterSelector.addEventListener("change", (e) => {
+                // set new value to filter variable
+                nodeFilterValue = e.target.value;
+                /*
+                refresh DataView,
+                so that its filter function is re-calculated with the new variable
+              */
+                nodesView.refresh();
+              });
+
+            // create a network
+            var container = document.getElementById("mynetwork");
+            var data = {
+            nodes: nodesView,
+            // Set edges to DataView which is filtered, rather than the DataSet
+            edges: edgesView,
+            };
+
+            var network = new vis.Network(container, data, options);
+
+            // Handler event when slider changes
+            document.getElementById('slider').oninput = function() {
+                // Get the value of the slider and store it
+                sliderValue = this.value;
+
+                // Refresh the data view so the update to sliderValue takes affect
+                edgesView.refresh();
+
+                // Update nodes
+                nodes.update(nodesData[sliderValue]);
+
+                // Display the selected value next to slider
+                document.getElementById('sliderValueDisplay').innerHTML = sliderValue;
+
+                //network.storePositions();
+                console.log(JSON.stringify(network.getPositions()));
+            }
+
+        </script>
+    </body>
+</html>
