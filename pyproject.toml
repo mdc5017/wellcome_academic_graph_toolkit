@@ -27,7 +27,8 @@ dependencies = [
     "networkx==3.2.1",
     "numpy==1.26.3",
     "pandas==2.2.0",
-    "tqdm==4.66.1"
+    "tqdm==4.66.1",
+    "cdindex==1.0.19"
 ]
 
 [project.urls]
