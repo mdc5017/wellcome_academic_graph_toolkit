@@ -6,7 +6,7 @@ import time
 import awswrangler as wr
 from multiprocessing import Pool, cpu_count
 import time
-import toolkit
+from wag_toolkit.diversity import IDR
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from wag_toolkit.utils import save_to_s3, read_from_s3
@@ -63,7 +63,7 @@ def calculate_diversity(
         else:
             get_metrics(pub_ids, -1, dim, S3_OUTPUT_FOLDER, weighted)
 
-    print("Completed {dim} similarity calculations in %s seconds" % str(time.time() - t0))
+    print(f"Completed {dim} similarity calculations in %s seconds" % str(time.time() - t0))
     return df
 
 def parallel_diversity(ids, 
@@ -110,7 +110,7 @@ def get_metrics(
         weighted(bool): Whether to weight by field similarity.
     """
 
-    idr = toolkit.IDR(s3_path=S3_OUTPUT_FOLDER, diversity=weighted)
+    idr = IDR(s3_path=S3_OUTPUT_FOLDER, weighted=weighted)
     idr = getattr(idr, dimension)
     df = idr(subset, max_chunk_size=100)
     save_to_s3(df, fname=f"{S3_OUTPUT_FOLDER}/parallel_files/{dimension}_{i}.csv")
@@ -148,7 +148,7 @@ def cosine_matrix(df, S3_OUTPUT_FOLDER):
     """
     
     print("Calculating cosine similarity")
-    idr = toolkit.IDR()
+    idr = IDR()
     try:
         df["super_group_counts"] = df["super_group_counts"].apply(
             lambda x: dict(eval(x))
@@ -173,7 +173,7 @@ def citation_matrix(df, S3_OUTPUT_FOLDER):
     """
     
     print("Calculating citation similarity")
-    idr = toolkit.IDR()
+    idr = IDR()
     try:
         df["pub_fields"] = df["pub_fields"].apply(lambda x: dict(eval(x)))
         df["super_group_counts"] = df["super_group_counts"].apply(

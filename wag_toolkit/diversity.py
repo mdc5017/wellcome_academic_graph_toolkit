@@ -8,9 +8,10 @@ from .utils import Neo4j
 class IDR(Neo4j):
     """Metrics for Interdisciplinarity Research"""
 
-    def __init__(self, cypher_query=None, s3_path=None, weighted=None):
+    def __init__(self, cypher_query=None, s3_path=None, weighted=None, graph=False):
         Neo4j.__init__(self, cypher_query, graph=False)
-        self.fields = pd.read_csv("scripts/input/anzsrc2020.csv")
+
+        self.fields = pd.read_csv("./idr/input/anzsrc2020.csv")
         self.fields["sub_group"] = self.fields["sub_group"].apply(lambda x: x.title())
         self.super_groups = list(
             self.fields["super_group"].apply(lambda x: x.title()).unique()
@@ -134,25 +135,25 @@ class IDR(Neo4j):
             queries.append(query)
         return cls(queries, graph=False)
 
-    @classmethod
-    def get_researcher_publications(cls, researchers, max_chunk_size=10000):
-        """Query PI's publications linked to researcher IDs
+    # @classmethod
+    # def get_researcher_publications(cls, researchers, max_chunk_size=10000):
+    #     """Query PI's publications linked to researcher IDs
 
-        Args:
-            researchers(list): List of researcher IDs
-            max_chunk_size(int): Maximum number of IDs to query per chunk.
+    #     Args:
+    #         researchers(list): List of researcher IDs
+    #         max_chunk_size(int): Maximum number of IDs to query per chunk.
 
-        """
+    #     """
 
-        queries = []
-        for i in range(0, len(researchers), max_chunk_size):
-            query = f"""
-                    MATCH (r:Researcher)-[a:AUTHORED]->(p:Publication)
-                    WHERE id(r) IN {researchers[i: i + max_chunk_size]}
-                    RETURN id(r), COLLECT(p.for)
-                    """
-            queries.append(query)
-        return cls(queries, graph=False)
+    #     queries = []
+    #     for i in range(0, len(researchers), max_chunk_size):
+    #         query = f"""
+    #                 MATCH (r:Researcher)-[a:AUTHORED]->(p:Publication)
+    #                 WHERE id(r) IN {researchers[i: i + max_chunk_size]}
+    #                 RETURN id(r), COLLECT(p.for)
+    #                 """
+    #         queries.append(query)
+    #     return cls(queries, graph=False)
     
     @classmethod
     def get_grantee_publications(cls, researchers, max_chunk_size=10000):
@@ -165,12 +166,20 @@ class IDR(Neo4j):
         """
 
         queries = []
-        for researcher, year, grant in researchers:
-            for i in range(0, len(researcher), max_chunk_size):
+        if isinstance(researchers[0], list):
+            for researcher, year, grant in researchers:
                 query = f"""
                         MATCH (g:Grant)-[l:AWARDED_TO]-(r:Researcher)-[a:AUTHORED]->(p:Publication)
-                        WHERE id(r) = {researcher[i: i + max_chunk_size]} AND p.year <= {year[i: i + max_chunk_size]} AND id(g) = {grant[i: i + max_chunk_size]}
+                        WHERE id(r) = {researcher} AND p.year <= {year} AND id(g) = {grant}
                         RETURN id(r), id(g), COLLECT(p.for)
+                        """
+                queries.append(query)
+        else:
+            for i in range(0, len(researchers), max_chunk_size):
+                query = f"""
+                        MATCH (r:Researcher)-[a:AUTHORED]->(p:Publication)
+                        WHERE id(r) IN {researchers[i: i + max_chunk_size]}
+                        RETURN id(r), COLLECT(p.for)
                         """
                 queries.append(query)
         return cls(queries, graph=False)

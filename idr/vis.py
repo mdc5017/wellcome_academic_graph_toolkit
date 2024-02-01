@@ -3,7 +3,7 @@ import numpy as np
 import plotly.express as px
 import boto3
 import gzip
-import toolkit
+from wag_toolkit.diversity import IDR
 from io import StringIO, BytesIO
 from .process import label_idr_types
 from wag_toolkit.utils import Neo4j, read_from_s3
@@ -158,7 +158,7 @@ def idr_types(S3_OUTPUT_FOLDER, scheme_mapping, award_mapping):
 
     fig.update_annotations(font_size=annotation_font_size)
 
-    fig.write_html("./vis/team_field_diversity.html")
+    fig.write_html("./idr/vis/team_field_diversity.html")
 
 
 def classify_xaxis(df):
@@ -258,7 +258,7 @@ def topic_treemap(S3_OUTPUT_FOLDER, award_mapping):
     )
 
     fig.update_traces(hoverlabel=dict(font_size=20))
-    fig.write_html("./vis/idr_topic_treemap.html")
+    fig.write_html("./idr/vis/topic_treemap.html")
     return
 
 def merge_topics(S3_OUTPUT_FOLDER, award_mapping):
@@ -384,7 +384,7 @@ def topic_diversity(S3_OUTPUT_FOLDER, award_mapping):
     )  # vertical line at the mean of jittered category
     fig.update_layout(margin=dict(l=20, r=20, t=150, b=20))
 
-    fig.write_html("./vis/topic_diversity.html")
+    fig.write_html("./idr/vis/topic_diversity.html")
     return
 
 def sub_fields(S3_OUTPUT_FOLDER):
@@ -395,7 +395,7 @@ def sub_fields(S3_OUTPUT_FOLDER):
     """
 
     outputs = read_from_s3(S3_OUTPUT_FOLDER + "/knowledge_integration.csv")
-    idr = toolkit.IDR(s3_path=None, diversity=False)
+    idr = IDR(s3_path=None, weighted=False)
     super_groups = idr.super_groups
     all_fields = outputs["p.for"].apply(lambda x: idr.format_fields([x])[0])
     outputs["sub_fields"] = all_fields.apply(
@@ -419,7 +419,7 @@ def subfield_diversity(S3_OUTPUT_FOLDER):
     sub_outputs = sub_outputs.explode("sub_fields")
 
     grouped = sub_outputs[["sub_fields", "rs_cosine"]].groupby("sub_fields").median()
-    idr = toolkit.IDR(s3_path=None, diversity=False)
+    idr = IDR(s3_path=None, weighted=False)
     grouped["std"] = (
         sub_outputs[["sub_fields", "rs_cosine"]]
         .groupby("sub_fields")
@@ -455,7 +455,7 @@ def subfield_diversity(S3_OUTPUT_FOLDER):
     )
     fig.add_hline(y=grouped["std"].mean(), line_dash="dash", line_color="black")
     fig.update_layout(margin=dict(l=20, r=20, t=150, b=20))
-    fig.write_html("./vis/subfield_diversity.html")
+    fig.write_html("./idr/vis/subfield_diversity.html")
     return
 
 
@@ -565,18 +565,5 @@ def subfield_treemap(S3_OUTPUT_FOLDER, award_mapping):
     )
 
     fig.update_traces(hoverlabel=dict(font_size=16))
-    fig.write_html("./vis/subfield_treemap.html")
-
-    fig = px.treemap(
-        sub,
-        path=[px.Constant("Topics"), "topic", "idr_types", "team_type", "grant"],
-        values="counts",
-        color="diversity",
-        hover_data={"topic": "topic"},
-        color_continuous_scale="tropic",
-        color_continuous_midpoint=np.average(counts["diversity"]),
-        title="Treemap of Publication Topics -> IDR Team Types -> Researcher Field Disciplines > Grants, coloured by Integration Diversity<br>"
-        + "<sup>Example: Genomic & Genetic Research makes up the largest portion of the portfolio. A large portion of this work is driven by individuals breaking down siloes<br>"
-        + "and Interdisciplinary teams, with the most diverse outputs arising from team grants such as STRADL, NextGenScot & GWAS.</sup>",
-    )
+    fig.write_html("./idr/vis/subfield_treemap.html")
     return

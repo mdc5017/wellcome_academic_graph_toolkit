@@ -9,6 +9,7 @@ def aggregate_grant_level(S3_OUTPUT_FOLDER):
     """
 
     # TEAM ANALYSIS
+    print ('Aggregating and cleaning team diversity data to grant level...')
     teams = read_from_s3(S3_OUTPUT_FOLDER+ "/grantees_fields.csv")
 
     # remove researchers with less than 20 publications
@@ -60,6 +61,7 @@ def aggregate_grant_level(S3_OUTPUT_FOLDER):
     save_to_s3(grant_teams, fname=S3_OUTPUT_FOLDER + "/grantees_field_bygrant.csv")
 
     # OUTPUT TO GRANT ANALYSIS
+    print ('Aggregating and cleaning output diversity data to grant level...')
     outputs = read_from_s3(S3_OUTPUT_FOLDER + "/knowledge_integration.csv")
 
     # remove outputs with less than 8 references
@@ -96,6 +98,7 @@ def aggregate_grant_level(S3_OUTPUT_FOLDER):
     )
 
     # IMPACT TO GRANT ANALYSIS
+    print ('Aggregating and cleaning citation diversity data to grant level...')
     impact = read_from_s3(S3_OUTPUT_FOLDER + "/knowledge_diffusion.csv")
 
     # remove publications  with less than 10 citations
@@ -133,6 +136,7 @@ def aggregate_grant_level(S3_OUTPUT_FOLDER):
         grant_impact, fname=S3_OUTPUT_FOLDER + "/knowledge_diffusion_bygrant.csv"
     )
 
+    print ('Merging team, output and citation diversity data to grant level...')
     merged = grant_impact.merge(grant_outputs, on="grant_id").merge(
         grant_teams, left_on="grant_id", right_on="g.dimensions_grant_id"
     )
@@ -142,7 +146,7 @@ def aggregate_grant_level(S3_OUTPUT_FOLDER):
     )
 
     save_to_s3(merged, fname=S3_OUTPUT_FOLDER + "/all_bygrant.csv")
-    return "Processed all input files to grant-level"
+    return print ("Processed all input files to grant-level")
 
 
 def label_idr_types(df, mean):

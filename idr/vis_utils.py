@@ -2,11 +2,12 @@ from html_reports import Report
 from wag_toolkit.utils import read_from_s3
 import matplotlib.pyplot as plt
 import seaborn as sns
-import wag_toolkit
+from wag_toolkit.diversity import IDR
 import pandas as pd
 import numpy as np
 from collections import Counter
-
+import warnings
+warnings.filterwarnings('ignore')
 
 def summary_reports(S3_OUTPUT_FOLDER, basic=None, diversity=None):
     """Create html report analysis on basic descriptives from teams,
@@ -18,23 +19,24 @@ def summary_reports(S3_OUTPUT_FOLDER, basic=None, diversity=None):
         diversity(bool): whether to output diversity summary report.
     """
 
+    print ('Loading diversity data for teams, outputs and citations...')
     global teams, outputs, impact, idr
 
     teams = read_from_s3(S3_OUTPUT_FOLDER + "/grantees_fields.csv")
     outputs = read_from_s3(S3_OUTPUT_FOLDER + "/knowledge_integration.csv")
     impact = read_from_s3(S3_OUTPUT_FOLDER + "/knowledge_diffusion.csv")
-    idr = wag_toolkit.IDR(s3_path=S3_OUTPUT_FOLDER, diversity=True)
+    idr = IDR(s3_path=S3_OUTPUT_FOLDER, weighted=True)
 
     # preprocessing
-    outputs["pub_fields"] = outputs["pub_fields"].apply(
-        lambda x: [i[0] for i in eval(x)]
-    )
+    # outputs["pub_fields"] = outputs["pub_fields"].apply(
+    #     lambda x: [i[0] for i in eval(x)]
+    # )
     impact["pub_fields"] = impact["pub_fields"].apply(
         lambda x: None if x is np.nan else [i[0] for i in eval(x)]
     )
 
     if basic:
-        print("Creating basic statistics summary report")
+        print("Creating basic statistics summary report...")
         rep1 = Report()
         rep1.add_title(
             "Descriptives Statistics from Portfolio for Teams, Outputs and Impact"
@@ -42,10 +44,11 @@ def summary_reports(S3_OUTPUT_FOLDER, basic=None, diversity=None):
         summary_statistics_teams(rep1)
         summary_statistics_outputs(rep1)
         summary_statistics_impact(rep1)
-        rep1.write_report(filename="./vis/summary_statistics_report.html")
+        rep1.write_report(filename="./idr/reports/summary_statistics_report.html")
+        print ('Done.')
 
     if diversity:
-        print("Creating diversity summary report")
+        print("Creating diversity summary report...")
         rep2 = Report()
         rep2.add_title("Summary of Diversity Metrics")
         summary_diversity(rep2)
@@ -53,7 +56,8 @@ def summary_reports(S3_OUTPUT_FOLDER, basic=None, diversity=None):
         summary_diversity_teams(rep2)
         summary_diversity_outputs(rep2)
         summary_diversity_impact(rep2)
-        rep2.write_report(filename= "./vis/summary_diversity_report.html")
+        rep2.write_report(filename= "./idr/reports/summary_diversity_report.html")
+        print ('Done.')
 
 def summary_statistics_teams(rep):
     """"Basic descriptive plots for researchers.
@@ -154,12 +158,14 @@ def summary_statistics_outputs(rep):
     field_counts = outputs.drop_duplicates(subset=["id(p)"])["pub_fields"].apply(
         lambda x: dict(eval(x))
     )
+    
     field_counts = (
         pd.DataFrame.from_records(list(field_counts.values), columns=idr.super_groups)
         .fillna(0)
         .sum(axis=0)
         .sort_values(ascending=False)
     )
+
     top3 = int(field_counts[:3].sum() / field_counts.sum() * 100)
 
     agg = outputs[["id(p)", "grant_id"]].groupby("grant_id").count()
@@ -243,7 +249,7 @@ def summary_statistics_impact(rep):
         ["pub_year", "citation_years"]
     ].apply(lambda x: Counter([i - x.pub_year for i in x.citation_years]), axis=1)
     temporal_citations["pub_fields_list"] = temporal_citations["pub_fields"].apply(
-        lambda x: [i[0] for i in eval(x)]
+        lambda x: [i[0] for i in x]
     )
     temporal_citations = temporal_citations[
         ["pub_year", "pub_fields_list", "post_publication_year_citations"]
@@ -482,7 +488,7 @@ def summary_diversity(rep):
     g = sns.jointplot(
         outputs,
         x="simpson_diversity",
-        y="drs_citation",
+        y="rs_citation",
         hue="pub_fields",
         ax=ax,
         legend=False,
@@ -494,7 +500,7 @@ def summary_diversity(rep):
     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0)
     plt.xlim((0, 1))
     plt.ylim((0, 0.7))
-    plt.axhline(outputs["drs_citation"].mean(), color="gray", linestyle="--")
+    plt.axhline(outputs["rs_citation"].mean(), color="gray", linestyle="--")
     plt.axvline(outputs["simpson_diversity"].mean(), color="gray", linestyle="--")
     plt.tight_layout()
     plt.draw()
@@ -504,7 +510,7 @@ def summary_diversity(rep):
     g = sns.jointplot(
         outputs,
         x="rs_cosine",
-        y="drs_citation",
+        y="rs_citation",
         hue="pub_fields",
         ax=ax,
         s=20,
@@ -982,5 +988,5 @@ def summary_report_grant_level(S3_OUTPUT_FOLDER, scheme_mapping):
     rep.add_figure()
     plt.clf()
 
-    rep.write_report(filename = "./vis/reports/summary_diversity_correlation.html")
+    rep.write_report(filename = "./idr/reports/summary_diversity_correlation.html")
     return
