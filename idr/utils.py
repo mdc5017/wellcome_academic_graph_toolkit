@@ -9,14 +9,14 @@ import time
 from wag_toolkit.diversity import IDR
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from wag_toolkit.utils import save_to_s3, read_from_s3
+from wag_toolkit.utils import save_to_s3
 
 
 def get_ids(fname):
     """Read file containing dimension linked grants and pubs.
 
     Args:
-        fname(str): location of file 
+        fname(str): location of file
     """
 
     s3 = boto3.client("s3")
@@ -28,15 +28,16 @@ def get_ids(fname):
     s3.close()
     return grant_ids, pub_ids
 
+
 def calculate_diversity(
-                        pub_ids,
-                        grant_ids=None,
-                        dim='grantees_fields',
-                        S3_OUTPUT_FOLDER="",
-                        parallel=True,
-                        weighted=None,
-                        ):
-    """Call parallelisation for diversity calculation and 
+    pub_ids,
+    grant_ids=None,
+    dim="grantees_fields",
+    S3_OUTPUT_FOLDER="",
+    parallel=True,
+    weighted=None,
+):
+    """Call parallelisation for diversity calculation and
     process parallel outputs to one.
 
     Args:
@@ -63,14 +64,15 @@ def calculate_diversity(
         else:
             get_metrics(pub_ids, -1, dim, S3_OUTPUT_FOLDER, weighted)
 
-    print(f"Completed {dim} similarity calculations in %s seconds" % str(time.time() - t0))
+    print(
+        f"Completed {dim} similarity calculations in %s seconds" % str(time.time() - t0)
+    )
     return df
 
-def parallel_diversity(ids, 
-                       dimension="grantee_fields", 
-                       S3_OUTPUT_FOLDER="", 
-                       weighted=None
-                       ):
+
+def parallel_diversity(
+    ids, dimension="grantee_fields", S3_OUTPUT_FOLDER="", weighted=None
+):
     """Thread IDs and get_metrics function to multiple CPU cores.
 
     Args:
@@ -94,12 +96,14 @@ def parallel_diversity(ids,
         )
     return
 
+
 def get_metrics(
-                subset,
-                i,
-                dimension="grantees_fields",
-                S3_OUTPUT_FOLDER="funding_impact_measures/idr/dr",
-                weighted=None):
+    subset,
+    i,
+    dimension="grantees_fields",
+    S3_OUTPUT_FOLDER="funding_impact_measures/idr/dr",
+    weighted=None,
+):
     """Call IDR toolkit to calculate diversity metrics.
 
     Args:
@@ -116,9 +120,10 @@ def get_metrics(
     save_to_s3(df, fname=f"{S3_OUTPUT_FOLDER}/parallel_files/{dimension}_{i}.csv")
     return
 
+
 def process_parallel_files(dimension, S3_OUTPUT_FOLDER):
     """Aggregate parallel files to single output.
-    
+
     Args:
         dimension(str): which outputs to aggregate.
         S3_OUTPUT_FOLDER(str): Output folder location.
@@ -146,7 +151,7 @@ def cosine_matrix(df, S3_OUTPUT_FOLDER):
         df(pd.DataFrame): knowledge integration matrix.
         S3_OUTPUT_FOLDER(str): Output folder location.
     """
-    
+
     print("Calculating cosine similarity")
     idr = IDR()
     try:
@@ -164,6 +169,7 @@ def cosine_matrix(df, S3_OUTPUT_FOLDER):
     save_to_s3(S, fname=S3_OUTPUT_FOLDER + "/cosine_similarity.csv")
     return
 
+
 def citation_matrix(df, S3_OUTPUT_FOLDER):
     """Calculate citation similarity from reference list.
 
@@ -171,7 +177,7 @@ def citation_matrix(df, S3_OUTPUT_FOLDER):
         df(pd.DataFrame): knowledge integration matrix.
         S3_OUTPUT_FOLDER(str): Output folder location.
     """
-    
+
     print("Calculating citation similarity")
     idr = IDR()
     try:

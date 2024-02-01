@@ -7,19 +7,21 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
+
 
 def summary_reports(S3_OUTPUT_FOLDER, basic=None, diversity=None):
     """Create html report analysis on basic descriptives from teams,
     outputs, citations data, as well as diversity analysis.
-    
+
     Args:
         S3_OUTPUT_FOLDER(str): Output folder location which will also be used as save_path.
         basic(bool): whether to output basic summary report.
         diversity(bool): whether to output diversity summary report.
     """
 
-    print ('Loading diversity data for teams, outputs and citations...')
+    print("Loading diversity data for teams, outputs and citations...")
     global teams, outputs, impact, idr
 
     teams = read_from_s3(S3_OUTPUT_FOLDER + "/grantees_fields.csv")
@@ -45,7 +47,7 @@ def summary_reports(S3_OUTPUT_FOLDER, basic=None, diversity=None):
         summary_statistics_outputs(rep1)
         summary_statistics_impact(rep1)
         rep1.write_report(filename="./idr/reports/summary_statistics_report.html")
-        print ('Done.')
+        print("Done.")
 
     if diversity:
         print("Creating diversity summary report...")
@@ -56,12 +58,13 @@ def summary_reports(S3_OUTPUT_FOLDER, basic=None, diversity=None):
         summary_diversity_teams(rep2)
         summary_diversity_outputs(rep2)
         summary_diversity_impact(rep2)
-        rep2.write_report(filename= "./idr/reports/summary_diversity_report.html")
-        print ('Done.')
+        rep2.write_report(filename="./idr/reports/summary_diversity_report.html")
+        print("Done.")
+
 
 def summary_statistics_teams(rep):
-    """"Basic descriptive plots for researchers.
-    
+    """Basic descriptive plots for researchers.
+
     Args:
         rep(html_report): report.
     """
@@ -142,9 +145,10 @@ def summary_statistics_teams(rep):
 
     return
 
+
 def summary_statistics_outputs(rep):
-    """"Basic descriptive plots for publication outputs.
-    
+    """ "Basic descriptive plots for publication outputs.
+
     Args:
         rep(html_report): report.
     """
@@ -158,7 +162,7 @@ def summary_statistics_outputs(rep):
     field_counts = outputs.drop_duplicates(subset=["id(p)"])["pub_fields"].apply(
         lambda x: dict(eval(x))
     )
-    
+
     field_counts = (
         pd.DataFrame.from_records(list(field_counts.values), columns=idr.super_groups)
         .fillna(0)
@@ -206,9 +210,10 @@ def summary_statistics_outputs(rep):
     plt.clf()
     return
 
+
 def summary_statistics_impact(rep):
-    """"Basic descriptive plots for publication citations.
-    
+    """ "Basic descriptive plots for publication citations.
+
     Args:
         rep(html_report): report.
     """
@@ -322,9 +327,10 @@ def summary_statistics_impact(rep):
     plt.clf()
     return
 
+
 def summary_diversity(rep):
-    """"Overall diversity heatmaps and correlation between weighted and unweighted.
-    
+    """ "Overall diversity heatmaps and correlation between weighted and unweighted.
+
     Args:
         rep(html_report): report.
     """
@@ -618,9 +624,10 @@ def summary_diversity(rep):
     plt.clf()
     return
 
+
 def summary_diversity_teams(rep):
-    """"Analysis of team diversity.
-    
+    """ "Analysis of team diversity.
+
     Args:
         rep(html_report): report.
     """
@@ -724,9 +731,10 @@ def summary_diversity_teams(rep):
     plt.clf()
     return
 
+
 def summary_diversity_outputs(rep):
-    """"Analysis of outputs diversity.
-    
+    """ "Analysis of outputs diversity.
+
     Args:
         rep(html_report): report.
     """
@@ -827,9 +835,10 @@ def summary_diversity_outputs(rep):
     plt.clf()
     return
 
+
 def summary_diversity_impact(rep):
-    """"Analysis of impact diversity.
-    
+    """ "Analysis of impact diversity.
+
     Args:
         rep(html_report): report.
     """
@@ -922,9 +931,10 @@ def summary_diversity_impact(rep):
     plt.clf()
     return
 
+
 def summary_report_grant_level(S3_OUTPUT_FOLDER, scheme_mapping):
     """Create html report analysis on basic descriptives from grants.
-    
+
     Args:
         S3_OUTPUT_FOLDER(str): Output folder location which will also be used as save_path.
         scheme_mapping(str): Location of metadata for grants by scheme.
@@ -988,5 +998,5 @@ def summary_report_grant_level(S3_OUTPUT_FOLDER, scheme_mapping):
     rep.add_figure()
     plt.clf()
 
-    rep.write_report(filename = "./idr/reports/summary_diversity_correlation.html")
+    rep.write_report(filename="./idr/reports/summary_diversity_correlation.html")
     return

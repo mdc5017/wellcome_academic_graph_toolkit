@@ -11,7 +11,7 @@ from wag_toolkit.utils import Neo4j, read_from_s3
 
 def idr_types(S3_OUTPUT_FOLDER, scheme_mapping, award_mapping):
     """Visualisation of grants by number of grantees and diversity.
-    
+
     Args:
         S3_OUTPUT_FOLDER(str): Output folder location which will also be used as save_path.
         scheme_mapping(str): Location of metadata for grants by scheme.
@@ -128,13 +128,13 @@ def idr_types(S3_OUTPUT_FOLDER, scheme_mapping, award_mapping):
     fig.add_annotation(
         x=merged[merged["grant_id"] == "grant.10029634"]["jittered"].values[0],
         y=merged[merged["grant_id"] == "grant.10029634"]["team_diversity"].values[0],
-        text="x"
+        text="x",
     )
 
     fig.add_annotation(
         x=merged[merged["grant_id"] == "grant.4579821"]["jittered"].values[0],
         y=merged[merged["grant_id"] == "grant.4579821"]["team_diversity"].values[0],
-        text="x"
+        text="x",
     )
 
     title_font_size = 24
@@ -163,7 +163,7 @@ def idr_types(S3_OUTPUT_FOLDER, scheme_mapping, award_mapping):
 
 def classify_xaxis(df):
     """X-axis formatting for idr types visualisation.
-    
+
     Args:
         df(pd.DataFrame): team dataframe.
     """
@@ -176,6 +176,7 @@ def classify_xaxis(df):
         y = df.no_team_fields + 1
     return y
 
+
 def unique_fields(row):
     fields = []
     for item in row:
@@ -186,9 +187,10 @@ def unique_fields(row):
                 fields.append(j)
     return fields
 
+
 def topic_treemap(S3_OUTPUT_FOLDER, award_mapping):
     """Visualisation of topics and nested IDR types, researcher fields and grants.
-    
+
     Args:
         S3_OUTPUT_FOLDER(str): Output folder location which will also be used as save_path.
         award_mapping(str): Location of grant award metadata.
@@ -261,9 +263,10 @@ def topic_treemap(S3_OUTPUT_FOLDER, award_mapping):
     fig.write_html("./idr/vis/topic_treemap.html")
     return
 
+
 def merge_topics(S3_OUTPUT_FOLDER, award_mapping):
     """Merge topics to publications.
-    
+
     Args:
         S3_OUTPUT_FOLDER(str): Output folder location which will also be used as save_path.
         award_mapping(str): Location of grant award metadata.
@@ -339,9 +342,10 @@ def merge_topics(S3_OUTPUT_FOLDER, award_mapping):
     )
     return outputs_merged, both
 
+
 def topic_diversity(S3_OUTPUT_FOLDER, award_mapping):
     """Visualisation of topic diversity scattered by diversity deviation.
-    
+
     Args:
         S3_OUTPUT_FOLDER(str): Output folder location which will also be used as save_path.
         award_mapping(str): Location of grant award metadata.
@@ -387,9 +391,10 @@ def topic_diversity(S3_OUTPUT_FOLDER, award_mapping):
     fig.write_html("./idr/vis/topic_diversity.html")
     return
 
+
 def sub_fields(S3_OUTPUT_FOLDER):
     """Get unique sub-fields from publication.
-    
+
     Args:
         S3_OUTPUT_FOLDER(str): Output folder location which will also be used as save_path.
     """
@@ -406,9 +411,10 @@ def sub_fields(S3_OUTPUT_FOLDER):
     )
     return outputs
 
+
 def subfield_diversity(S3_OUTPUT_FOLDER):
     """Visualisation of topic diversity scattered by diversity deviation.
-    
+
     Args:
         S3_OUTPUT_FOLDER(str): Output folder location which will also be used as save_path.
     """
@@ -461,7 +467,7 @@ def subfield_diversity(S3_OUTPUT_FOLDER):
 
 def subfield_treemap(S3_OUTPUT_FOLDER, award_mapping):
     """Visualisation of sub-fields and nested IDR types, researcher fields and grants.
-    
+
     Args:
         S3_OUTPUT_FOLDER(str): Output folder location which will also be used as save_path.
         award_mapping(str): Location of grant award metadata.

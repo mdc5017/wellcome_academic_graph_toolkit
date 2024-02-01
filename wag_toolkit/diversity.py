@@ -5,6 +5,7 @@ from .utils import read_from_s3
 
 from .utils import Neo4j
 
+
 class IDR(Neo4j):
     """Metrics for Interdisciplinarity Research"""
 
@@ -72,7 +73,7 @@ class IDR(Neo4j):
                     super_group.append(f)
             super_group_fields.append(list(set(super_group)))
         return super_group_fields
-    
+
     def researcher_fields(self, researcher_fields):
         try:
             formatted_fields = self.format_fields(researcher_fields)
@@ -135,26 +136,6 @@ class IDR(Neo4j):
             queries.append(query)
         return cls(queries, graph=False)
 
-    # @classmethod
-    # def get_researcher_publications(cls, researchers, max_chunk_size=10000):
-    #     """Query PI's publications linked to researcher IDs
-
-    #     Args:
-    #         researchers(list): List of researcher IDs
-    #         max_chunk_size(int): Maximum number of IDs to query per chunk.
-
-    #     """
-
-    #     queries = []
-    #     for i in range(0, len(researchers), max_chunk_size):
-    #         query = f"""
-    #                 MATCH (r:Researcher)-[a:AUTHORED]->(p:Publication)
-    #                 WHERE id(r) IN {researchers[i: i + max_chunk_size]}
-    #                 RETURN id(r), COLLECT(p.for)
-    #                 """
-    #         queries.append(query)
-    #     return cls(queries, graph=False)
-    
     @classmethod
     def get_grantee_publications(cls, researchers, max_chunk_size=10000):
         """Query PI's publications linked to grant IDs
@@ -266,7 +247,7 @@ class IDR(Neo4j):
 
     def simpson(self, counts):
         """Calculate Simpsons Diversity without replacement.
-        
+
         Args:
             count(Counter): Super group counts.
 
@@ -284,10 +265,10 @@ class IDR(Neo4j):
 
     def unweighted_rs(self, counts):
         """Calculate probability that any samples are not the same without replacement.
-        
+
         Args:
             count(Counter): Super group counts.
-            
+
         """
 
         values_fors = list(reversed([i[1] for i in counts]))
@@ -304,7 +285,7 @@ class IDR(Neo4j):
 
     def rao_stirling(self, counts, w):
         """Calculate Rao-Stirling Diversity.
-        
+
         Args:
             count(Counter): Super group counts.
             w(pd.DataFrame): Similarity matrix.
@@ -324,7 +305,7 @@ class IDR(Neo4j):
             return d
         else:
             return np.nan
-        
+
     def grant_fields(self, grant_ids):
         """Retrieve fields associated to each grant and unique super-groups.
 
@@ -339,15 +320,15 @@ class IDR(Neo4j):
             grant_fields["all_fields"]
         )
         return grant_fields
-    
-    def query_to_diversity(self, df, for_col = "COLLECT(p.for)"):
+
+    def query_to_diversity(self, df, for_col="COLLECT(p.for)"):
         """Process and format query data and calculate diversity.
-        
+
         Args:
             df(pd.DataFrame): queried data as dataframe.
             for_cols(str): string to index FoR column.
         """
-        
+
         df["no_pubs"] = df[for_col].apply(lambda x: len(x))
         df["super_group_counts"] = df[for_col].apply(
             lambda x: self.researcher_fields(x)
@@ -355,9 +336,9 @@ class IDR(Neo4j):
         df["top_supergroups"] = df["super_group_counts"].apply(
             lambda x: self.top_fields(x)
         )
-        df["simpson_diversity"] = df[
-            "super_group_counts"
-        ].apply(lambda x: self.simpson(x))
+        df["simpson_diversity"] = df["super_group_counts"].apply(
+            lambda x: self.simpson(x)
+        )
 
         if self.cosine_similarity is not None:
             df["rs_cosine"] = df["super_group_counts"].apply(
@@ -370,13 +351,11 @@ class IDR(Neo4j):
             )
 
         if for_col == "COLLECT(c.for)":
-            df["pub_fields"] = df["p.for"].apply(
-                lambda x: self.researcher_fields([x])
-            )
+            df["pub_fields"] = df["p.for"].apply(lambda x: self.researcher_fields([x]))
         return df
 
     def grantees_fields(self, grant_ids, max_chunk_size=10000):
-        """Retrieve researchers linked to to each grant and calculate 
+        """Retrieve researchers linked to to each grant and calculate
         diversity of their publication history.
 
         Args:
@@ -385,7 +364,9 @@ class IDR(Neo4j):
         """
 
         grantees = self.get_grantees(grant_ids, max_chunk_size=10000).data
-        researchers = [[i["id(r)"], int(i["g.start_date"][:4]), i["id(g)"]] for i in grantees]
+        researchers = [
+            [i["id(r)"], int(i["g.start_date"][:4]), i["id(g)"]] for i in grantees
+        ]
         publications = self.get_grantee_publications(
             researchers, max_chunk_size=max_chunk_size
         ).data
@@ -410,9 +391,9 @@ class IDR(Neo4j):
         grant_pub_fields = pd.DataFrame(grant_pub_fors)
         if len(grant_pub_fields) != 0:
             grant_pub_fields = self.query_to_diversity(grant_pub_fields)
-            return grant_pub_fields    
+            return grant_pub_fields
         else:
-            return None        
+            return None
 
     def publication_fields(self, pub_ids):
         """Retrieve fields associated to publicand unique super-groups.
@@ -439,7 +420,7 @@ class IDR(Neo4j):
         ref_fors = self.reference_list(pub_ids, max_chunk_size).data
         ref_fields = pd.DataFrame(ref_fors)
         if len(ref_fields) != 0:
-            ref_fields = self.query_to_diversity(ref_fields, for_col = "COLLECT(c.for)")
+            ref_fields = self.query_to_diversity(ref_fields, for_col="COLLECT(c.for)")
             ref_fields["no_refs"] = ref_fields["no_pubs"]
             return ref_fields
         else:
@@ -455,7 +436,7 @@ class IDR(Neo4j):
         cite_fors = self.citation_list(pub_ids, delay, max_chunk_size).data
         cite_fields = pd.DataFrame(cite_fors)
         if len(cite_fields) != 0:
-            cite_fields = self.query_to_diversity(cite_fields, for_col = "COLLECT(c.for)")
+            cite_fields = self.query_to_diversity(cite_fields, for_col="COLLECT(c.for)")
             cite_fields["no_cite"] = cite_fields["no_pubs"]
             return cite_fields
         else:
