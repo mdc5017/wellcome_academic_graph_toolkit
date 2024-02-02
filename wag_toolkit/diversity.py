@@ -364,9 +364,17 @@ class IDR(Neo4j):
         """
 
         grantees = self.get_grantees(grant_ids, max_chunk_size=10000).data
-        researchers = [
-            [i["id(r)"], int(i["g.start_date"][:4]), i["id(g)"]] for i in grantees
-        ]
+
+        # researchers = [
+        #     [i["id(r)"], int(i["g.start_date"][:4]), i["id(g)"]] for i in grantees
+        # ]
+        researchers = []
+        for i in grantees:
+            try:
+                researchers.append([i["id(r)"], int(i["g.start_date"][:4]), i["id(g)"]])
+            except:
+                pass
+
         publications = self.get_grantee_publications(
             researchers, max_chunk_size=max_chunk_size
         ).data

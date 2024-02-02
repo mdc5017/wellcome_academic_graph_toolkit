@@ -29,6 +29,22 @@ def get_ids(fname):
     return grant_ids, pub_ids
 
 
+def get_sanger_ids(fname):
+    """Read file containing dimension linked grants and pubs.
+
+    Args:
+        fname(str): location of file
+    """
+
+    global dr_grants
+    dr_grants = pd.read_csv(fname)
+    grant_ids = list(dr_grants["g.dimensions_grant_id"].dropna().unique())
+    pub_ids = list(dr_grants["p.dimensions_publication_id"].dropna().unique())
+    dr_grants["id"] = dr_grants["p.dimensions_publication_id"]
+    dr_grants["grant_id"] = dr_grants["g.dimensions_grant_id"]
+    return grant_ids, pub_ids
+
+
 def calculate_diversity(
     pub_ids,
     grant_ids=None,
@@ -57,12 +73,14 @@ def calculate_diversity(
             df = process_parallel_files(dim, S3_OUTPUT_FOLDER)
         else:
             get_metrics(grant_ids, -1, dim, S3_OUTPUT_FOLDER, weighted)
+            df = process_parallel_files(dim, S3_OUTPUT_FOLDER)
     else:
         if parallel:
             parallel_diversity(pub_ids, dim, S3_OUTPUT_FOLDER, weighted)
             df = process_parallel_files(dim, S3_OUTPUT_FOLDER)
         else:
             get_metrics(pub_ids, -1, dim, S3_OUTPUT_FOLDER, weighted)
+            df = process_parallel_files(dim, S3_OUTPUT_FOLDER)
 
     print(
         f"Completed {dim} similarity calculations in %s seconds" % str(time.time() - t0)
