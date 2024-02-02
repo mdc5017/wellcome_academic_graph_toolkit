@@ -29,14 +29,6 @@ def summary_reports(S3_OUTPUT_FOLDER, basic=None, diversity=None):
     impact = read_from_s3(S3_OUTPUT_FOLDER + "/knowledge_diffusion.csv")
     idr = IDR(s3_path=S3_OUTPUT_FOLDER, weighted=True)
 
-    # preprocessing
-    # outputs["pub_fields"] = outputs["pub_fields"].apply(
-    #     lambda x: [i[0] for i in eval(x)]
-    # )
-    impact["pub_fields"] = impact["pub_fields"].apply(
-        lambda x: None if x is np.nan else [i[0] for i in eval(x)]
-    )
-
     if basic:
         print("Creating basic statistics summary report...")
         rep1 = Report()
@@ -243,7 +235,11 @@ def summary_statistics_impact(rep):
     )
 
     # calculate average citation rates per year after publication
-    temporal_citations = impact[["p.date", "COLLECT(c.date)", "pub_fields"]].dropna()
+    temporal_citations = (
+        impact[["p.date", "COLLECT(c.date)", "pub_fields", "id(p)"]]
+        .drop_duplicates(subset=["id(p)"])
+        .dropna()
+    )
     temporal_citations["pub_year"] = temporal_citations["p.date"].apply(
         lambda x: int(x[:4])
     )
@@ -254,7 +250,7 @@ def summary_statistics_impact(rep):
         ["pub_year", "citation_years"]
     ].apply(lambda x: Counter([i - x.pub_year for i in x.citation_years]), axis=1)
     temporal_citations["pub_fields_list"] = temporal_citations["pub_fields"].apply(
-        lambda x: [i[0] for i in x]
+        lambda x: [i[0] for i in eval(x)]
     )
     temporal_citations = temporal_citations[
         ["pub_year", "pub_fields_list", "post_publication_year_citations"]
@@ -291,12 +287,52 @@ def summary_statistics_impact(rep):
             verticalalignment="center",
             horizontalalignment="left",
             color=line.get_color(),
-            fontsize=20,
+            fontsize=10,
         )
 
     plt.xlabel("Years After Publication")
     plt.ylabel("Average Citation")
     plt.title("Mean Citations per Field per Year Post Publication")
+    plt.tight_layout()
+    ax = plt.gca()
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    plt.tight_layout()
+    plt.draw()
+    rep.add_figure()
+    plt.clf()
+
+    grouped = citations_t.groupby("field").median()
+    grouped_counts = citations_t.groupby("field").count()
+
+    # plot cumulative median citation rates per year after publication
+    plt.clf()
+    sns.set_style("whitegrid")
+    sns.set(font_scale=1.5)
+    plt.figure(figsize=(10, 16))
+    lineplot = sns.lineplot(
+        grouped.T.cumsum(),
+        palette=sns.color_palette("Set2"),
+        dashes=False,
+        legend=False,
+    )
+    for line, name in zip(lineplot.lines, grouped.T.columns):
+        x, y = line.get_data()
+        e = np.random.uniform(-0.25, 0.25, 1)[0]
+        lineplot.text(
+            x[-1],
+            y[-1] + e,
+            "  " + name + ": " + str(grouped_counts.loc[name][0]),
+            verticalalignment="center",
+            horizontalalignment="left",
+            color=line.get_color(),
+            fontsize=10,
+        )
+
+    plt.xlabel("Years After Publication")
+    plt.ylabel("Average Citation")
+    plt.title("Median Citations per Field per Year Post Publication")
     plt.tight_layout()
     ax = plt.gca()
 

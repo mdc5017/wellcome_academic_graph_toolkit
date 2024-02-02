@@ -69,7 +69,7 @@ if __name__ == "__main__":
     cosine_matrix(df, args.S3_OUTPUT_FOLDER)
     citation_matrix(df, args.S3_OUTPUT_FOLDER)
 
-    # calculate diversity using similarity weights for portfolio
+    # # calculate diversity using similarity weights for portfolio
     dimensions = ["grantees_fields", "knowledge_integration", "knowledge_diffusion"]
     for dim in dimensions:
         calculate_diversity(

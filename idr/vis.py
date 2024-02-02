@@ -375,7 +375,7 @@ def topic_diversity(S3_OUTPUT_FOLDER, award_mapping):
             "std": "Integration Diversity Standard Deviation",
             "topic": "Topic",
         },
-        title="Scatterplot of Topic Interation Diversity by Deviation<br>"
+        title="Scatterplot of Topic Integration Diversity by Deviation<br>"
         + "<sup>Topics are shown as scatter points with their size proportional to the number of times the topic appears in the portfolio.<br>"
         + "Topics are scattered by average integration diversity and the standard deviation of integration diversity.<br>"
         + "Higher deviation (y-axis) represents topics that with varying levels of knowledge integration.<br></sup><br>",
