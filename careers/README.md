@@ -8,6 +8,8 @@ Make a virtual environment:
 and activate this environment: `source venv/bin/activate`. Now install the requirements file:
 ```pip install -r requirements.txt```
 
+Finally, you will need a `.envrc` file with your personal information, [as described in the Wellcome Academic Graph repo](https://github.com/wellcometrust/wellcome_academic_graph). Loading the `.envrc`file can be done with the command `direnv allow`, if you work in bash you might need to do `eval "$(direnv hook zsh)"`.
+
 ## file overview
 
 * `career_pipeline.py` is the main pipeline file which loads and transforms career and bibliography data from the [Wellcome Academic Graph](https://github.com/wellcometrust/wellcome_academic_graph.git). Transformed data is saved on s3 under `datalabs-data/dimensions/careers/`. Most analysis relies on `s3://datalabs-data/dimensions/careers/exploded_career_data/researchers_exploded.csv`, which is a table one row per researcher and columns (often with lists) containing fields such as:

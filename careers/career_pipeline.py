@@ -40,6 +40,7 @@ class CareerStage(Neo4j):
         self.researchers_exploded_path = "dimensions/careers/exploded_career_data/researchers_exploded"
         
         # variables
+        
         self.RCR_log_threshold = 2.1
 
 
@@ -175,7 +176,7 @@ class CareerStage(Neo4j):
         """
         Loads the exploded career data (grouped by researcher)
         """
-        print("loading career info from s3", end=" ")
+        print("loading career info (exploded) from s3", end=" ")
         s3 = boto3.client("s3")
         combined_df = []
         s3_objects = s3.list_objects(
@@ -589,7 +590,7 @@ class CareerStage(Neo4j):
             "funder_crick"
         ].progress_apply(lambda x: any(x))
         self.career_data_exploded[
-            "one_or_more_Wellcome_pubs"
+            "one_or_more_wellcome_pubs"
         ] = self.career_data_exploded["funder_wellcome"].progress_apply(
             lambda x: any(x)
         )
