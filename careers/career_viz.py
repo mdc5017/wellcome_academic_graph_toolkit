@@ -398,6 +398,7 @@ if __name__ == "__main__":
 
     rep.add_markdown("The following graph shows how the proportion of 'influential' papers have changed over time for each functions.")
     RCR_log_over_time_viz()
+    rep.add_figure(options="width = 70%") 
 
     rep.add_markdown("To get a sense of improvement in seniority of our researchers, we can have a look at how long it took those researchers to go from first to last author position. \
                      The idea being that early in a career, researchers are more likely to be first author, and later in their career, they are more likely to be last author. \

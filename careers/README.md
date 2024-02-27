@@ -43,3 +43,7 @@ Finally, you will need a `.envrc` file with your personal information, [as descr
 * `career_viz_calcs.py` is used for all calculations and data manipulation needed to create the visualisations
 
 * `career_viz.py` creates the graph and the report html.
+
+## output
+
+The output of this analysis can be found [here](https://ds.wellcome.data/career_bibliometrics/Report.html)
