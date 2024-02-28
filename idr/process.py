@@ -49,6 +49,9 @@ def aggregate_grant_level(S3_OUTPUT_FOLDER):
     grant_teams["top_fields"] = (
         teams[["id(g)", "top_field"]].groupby("id(g)")["top_field"].apply(list).values
     )
+    grant_teams["g.start_date"] = (
+        teams[["id(g)", "g.start_date"]].groupby("id(g)").first()["g.start_date"].values
+    )
     grant_teams.columns = [
         "team_diversity",
         "team_std_diversity",
@@ -58,7 +61,17 @@ def aggregate_grant_level(S3_OUTPUT_FOLDER):
         "g.original_source_id",
         "researcher_fields",
         "top_fields",
+        "g.start_date",
     ]
+
+    grant_teams["no_team_fields"] = grant_teams["top_fields"].apply(
+        lambda x: len(list(set(x)))
+    )
+
+    grant_teams["idr_types"] = grant_teams.apply(
+        lambda x: label_idr_types(x, mean), axis=1
+    )
+
     save_to_s3(grant_teams, fname=S3_OUTPUT_FOLDER + "/grantees_field_bygrant.csv")
 
     # OUTPUT TO GRANT ANALYSIS
@@ -94,6 +107,13 @@ def aggregate_grant_level(S3_OUTPUT_FOLDER):
         "grant_id",
         "pub_fields",
     ]
+    grant_outputs = grant_outputs.merge(
+        teams[["g.dimensions_grant_id", "g.start_date"]].drop_duplicates(),
+        left_on="grant_id",
+        right_on="g.dimensions_grant_id",
+        how="left",
+    ).dropna()
+
     save_to_s3(
         grant_outputs, fname=S3_OUTPUT_FOLDER + "/knowledge_integration_bygrant.csv"
     )
@@ -133,6 +153,14 @@ def aggregate_grant_level(S3_OUTPUT_FOLDER):
         "grant_id",
         "pub_fields",
     ]
+
+    grant_impact = grant_impact.merge(
+        teams[["g.dimensions_grant_id", "g.start_date"]].drop_duplicates(),
+        left_on="grant_id",
+        right_on="g.dimensions_grant_id",
+        how="left",
+    ).dropna()
+
     save_to_s3(
         grant_impact, fname=S3_OUTPUT_FOLDER + "/knowledge_diffusion_bygrant.csv"
     )

@@ -22,7 +22,7 @@ parser.add_argument(
     "S3_OUTPUT_FOLDER",
     metavar="output_path",
     type=str,
-    default="funding_impact_measures/idr/dr_test",
+    default="funding_impact_measures/idr/dr",
     help="folder to save analysis outputs.",
     nargs="?",
 )
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     # read grant and pub ids
     grant_ids, pub_ids = get_ids(fname=args.input_path)
-    # grant_ids, pub_ids = get_sanger_ids(fname=args.input_path)
+    grant_ids, pub_ids = get_sanger_ids(fname=args.input_path)
 
     # calculate knowledge_integration/reference list to allow for cosine similarity calculation
     df = calculate_diversity(
