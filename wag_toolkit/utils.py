@@ -1,10 +1,14 @@
 import json
 import os
+import asyncio
 
 import neo4j
 import pandas as pd
 import boto3
 from tqdm import tqdm
+
+import boto3
+from io import StringIO, BytesIO
 
 
 class Neo4j:
@@ -20,7 +24,7 @@ class Neo4j:
         self.edges = []
         self.data = []
 
-        self.query(cypher_query)
+        self.query(cypher_query, as_graph=graph)
 
     def _transaction(self, tx, query, parameters, as_graph=True):
         """Run a query as Neo4j transaction."""
@@ -111,6 +115,9 @@ class Neo4j:
         """
         s3 = boto3.client("s3")
         self.data = []
+        for fpath in s3.ls(bucket):
+            with s3.open(fpath, "r") as f:
+                self.data.extend(json.load(f))
         fpaths = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
         keys = [meta["Key"] for meta in fpaths["Contents"]]
         for key in keys:
@@ -122,3 +129,98 @@ class Neo4j:
                 print(f"Unable to load file: {key}.")
 
         s3.close()
+
+
+class Neo4jA:
+    """Neo4j asynchronous query helper to return data from the graph."""
+
+    def __init__(self, cypher_queries=None, graph=True, s3_path=None):
+        self.uri = os.environ["NEO4J_BOLT_URL"]
+        self.user = os.environ["NEO4J_USERNAME"]
+        self.password = os.environ["NEO4J_PASSWORD"]
+
+        self.nodes = []
+        self.edges = []
+        self.data = []
+        if cypher_queries is not None:
+            asyncio.run(self.query(cypher_queries, as_graph=graph))
+
+    async def _transaction(self, tx, query, parameters, as_graph=True):
+        """Run a query as Neo4j transaction."""
+        result = await tx.run(query, parameters)
+        if as_graph:
+            data = await result.graph()
+        else:
+            data = await result.data()
+        await result.consume()
+        return data
+
+    async def session_task(
+        self, driver, query, parameters=None, db=None, as_graph=True
+    ):
+        async with driver.session(database=db) as session:
+            graph = await session.read_transaction(
+                self._transaction, query, parameters, as_graph
+            )
+            if as_graph:
+                self.nodes.extend([node for node in graph._nodes.values()])
+                self.edges.extend([node for node in graph._relationships.values()])
+            else:
+                self.data.extend([data for data in graph])
+
+    async def query(self, query, parameters=None, db=None, as_graph=True):
+        """Run provided query and return results as nodes and edges.
+
+        Args:
+            query(str, list): Neo4j query string or list of query strings.
+            parameters(list): Query parameters.
+            db(str): Database name.
+
+        """
+        if not isinstance(query, list):
+            query = [query]
+
+        async with neo4j.AsyncGraphDatabase.driver(
+            self.uri, auth=(self.user, self.password)
+        ) as driver:
+            tasks = []
+            for i, q in enumerate(tqdm(query)):
+                tasks.append(
+                    asyncio.create_task(
+                        self.session_task(driver, q, parameters, db, as_graph)
+                    )
+                )
+            await asyncio.gather(*tasks)
+
+    def to_df(self, node):
+        """Convert node properties to dataframe.
+
+        Args:
+            node(str): Node label, e.g. Publication
+
+        Returns:
+            pd.DataFrame: Properties of all nodes for a given label.
+        """
+        filtered = filter(lambda n: node in n._labels, self.nodes)
+        df = pd.DataFrame([n._properties for n in filtered])
+        return df
+
+
+def save_to_s3(file, fname):
+    print("Saving file")
+    if file is not None:
+        s3 = boto3.client("s3")
+        csv_buffer = StringIO()
+        file.to_csv(csv_buffer)
+        csv_buffer.getvalue()
+        s3.put_object(Bucket="datalabs-data", Body=csv_buffer.getvalue(), Key=fname)
+        s3.close()
+        return print("File saved")
+
+
+def read_from_s3(fname):
+    s3 = boto3.client("s3")
+    obj = s3.get_object(Bucket="datalabs-data", Key=fname)
+    df = pd.read_csv(BytesIO(obj["Body"].read()))
+    s3.close()
+    return df
