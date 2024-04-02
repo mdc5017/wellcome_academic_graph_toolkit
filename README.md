@@ -2,7 +2,7 @@
 
 Toolkit for working with the Wellcome Academic Graph and associated analysis code.
 
-### Initial Setup
+## Initial Setup
 
 Make sure [direnv](https://direnv.net/docs/installation.html) is installed on the machine, this will allow us to better control our environment variables in an isolated environment.
 
