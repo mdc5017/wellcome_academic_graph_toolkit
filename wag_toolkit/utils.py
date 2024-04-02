@@ -10,7 +10,7 @@ from tqdm import tqdm
 class Neo4j:
     """Neo4j query helper to return data from the graph."""
 
-    def __init__(self, cypher_query=None, graph=True, s3_path=None):
+    def __init__(self, cypher_query=None, lookup=None, graph=True, s3_path=None):
         """Initialise with Neo4j query results."""
         self._driver = neo4j.GraphDatabase.driver(
             os.environ["NEO4J_BOLT_URL"],
@@ -20,7 +20,10 @@ class Neo4j:
         self.edges = []
         self.data = []
 
-        self.query(cypher_query, as_graph=graph, s3_path=s3_path)
+        if lookup:
+            self.lookup_query(query=cypher_query, lookup=lookup, as_graph=graph, s3_path=s3_path)
+        else:
+            self.query(query=cypher_query, as_graph=graph, s3_path=s3_path)
 
     def _transaction(self, tx, query, parameters, as_graph=True):
         """Run a query as Neo4j transaction."""
@@ -66,7 +69,7 @@ class Neo4j:
             finally:
                 session.close()
     
-    def lookup_query(self, query, lookup, max_chunk_size=10000, as_graph=False, s3_path=None):
+    def lookup_query(self, query, lookup, max_chunk_size=1000, as_graph=False, s3_path=None):
         """Run provided lookup query in batches.
 
         Args:
@@ -78,8 +81,8 @@ class Neo4j:
 
         """
         queries = []
-        lookup_string = "','".join(lookup[i: i + max_chunk_size])
         for i in range(0, len(lookup), max_chunk_size):
+            lookup_string = "','".join(lookup[i: i + max_chunk_size])
             subquery = query.format(f"['{lookup_string}']")
             queries.append(subquery)
         self.query(queries, as_graph=as_graph, s3_path=s3_path)

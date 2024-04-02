@@ -20,29 +20,30 @@ except:
 class Citations(Neo4j):
     """Citations from Wellcome Academic Graph."""
 
-    def __init__(self, cypher_query=None):
-        super().__init__(cypher_query)
+    def __init__(self, cypher_query=None, lookup=None):
+        super().__init__(cypher_query, lookup)
         self.filtered_ids = None
 
     @classmethod
-    def from_publication_ids(cls, publication_ids, max_chunk_size=10000):
+    def from_publication_ids(cls, publication_ids, forward=True):
         """Initialise WAG with publications from
-        Dimensions publication IDs and their citations.
+        Dimensions publication IDs and their citations or cited publications.
 
         Args:
             publication_ids(list): List of Dimensions IDs.
-            max_chunk_size(int): Maximum number of IDs to query per chunk.
+            forward(bool): Whether to load citing or cited publications.
 
         """
-        queries = []
-        for i in range(0, len(publication_ids), max_chunk_size):
-            query = f"""
-            MATCH (p:Publication)-[r:CITED_BY]->(q)
-            WHERE p.dimensions_publication_id IN ['{"','".join(publication_ids[i: i + max_chunk_size])}']
+        if forward:
+            direction = "-[r:CITED_BY]->"
+        else:
+            direction = "<-[r:CITED_BY]-"
+        query = f"""
+            MATCH (p:Publication){direction}(q)
+            WHERE p.dimensions_publication_id IN {{}}
             RETURN *
             """
-            queries.append(query)
-        return cls(queries)
+        return cls(query, lookup=publication_ids)
 
     def _add_cited(self, publication_ids, max_chunk_size=100):
         """Load publications cited by the publications provided in publication_ids.
@@ -52,16 +53,13 @@ class Citations(Neo4j):
             max_chunk_size(int): Maximum number of IDs to query per chunk.
 
         """
-        queries = []
-        for i in range(0, len(publication_ids), max_chunk_size):
-            q = f"""
+        query = """
             MATCH (c1:Publication)-[:CITED_BY]->(p:Publication)
-            WHERE p.dimensions_publication_id IN ['{"','".join(publication_ids[i: i + max_chunk_size])}']
+            WHERE p.dimensions_publication_id IN {}
             RETURN p.dimensions_publication_id AS citing, p.date AS citing_pdate, p.year AS citing_pyear,
                 c1.dimensions_publication_id AS cited, c1.date AS cited_pdate, c1.year AS cited_pyear
             """
-            queries.append(q)
-        self.query(queries, as_graph=False)
+        self.lookup_query(query, lookup=publication_ids, max_chunk_size=max_chunk_size, as_graph=False)
 
     def _add_citations(self, publication_ids, max_chunk_size=100):
         """Load publications citing the publications provided in publication_ids.
@@ -71,16 +69,13 @@ class Citations(Neo4j):
             max_chunk_size(int): Maximum number of IDs to query per chunk.
 
         """
-        queries = []
-        for i in range(0, len(publication_ids), max_chunk_size):
-            q = f"""
+        query = """
             MATCH (p:Publication)-[:CITED_BY]->(c2:Publication)
-            WHERE p.dimensions_publication_id IN ['{"','".join(publication_ids[i: i + max_chunk_size])}']
+            WHERE p.dimensions_publication_id IN {}
             RETURN c2.dimensions_publication_id AS citing, c2.date AS citing_pdate, c2.year AS citing_pyear,
                 p.dimensions_publication_id AS cited, p.date AS cited_pdate, p.year AS cited_pyear
             """
-            queries.append(q)
-        self.query(queries, as_graph=False)
+        self.lookup_query(query, lookup=publication_ids, max_chunk_size=max_chunk_size, as_graph=False)
 
     def add_cdindex_data(
         self, publication_ids, filter_by_year=True, max_chunk_size=100
