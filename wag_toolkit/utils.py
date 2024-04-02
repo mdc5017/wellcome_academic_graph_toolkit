@@ -20,7 +20,7 @@ class Neo4j:
         self.edges = []
         self.data = []
 
-        self.query(cypher_query)
+        self.query(cypher_query, as_graph=graph, s3_path=s3_path)
 
     def _transaction(self, tx, query, parameters, as_graph=True):
         """Run a query as Neo4j transaction."""
@@ -39,6 +39,7 @@ class Neo4j:
             query(str, list): Neo4j query string or list of query strings.
             parameters(list): Query parameters.
             db(str): Database name.
+            as_graph(bool): Whether to return the results as graph or json format.
             s3_path(Optional[str]): Optional path to s3 bucket to save interim query results to.
 
         """
@@ -64,8 +65,26 @@ class Neo4j:
                     self.data.extend(data)
             finally:
                 session.close()
+    
+    def lookup_query(self, query, lookup, max_chunk_size=10000, as_graph=False, s3_path=None):
+        """Run provided lookup query in batches.
 
-    def to_df(self, node):
+        Args:
+            query(str): Lookup query containing {} where the IDs will be inserted, e.g. 
+                "MATCH (p:Publication) WHERE p.dimensions_publication_id IN {} RETURN *".
+            lookup(list): List of IDs to look up.
+            max_chunk_size(int): Maximum number of IDs to query per chunk.
+            s3_path(Optional[str]): Optional path to s3 bucket to save interim query results to.
+
+        """
+        queries = []
+        lookup_string = "','".join(lookup[i: i + max_chunk_size])
+        for i in range(0, len(lookup), max_chunk_size):
+            subquery = query.format(f"['{lookup_string}']")
+            queries.append(subquery)
+        self.query(queries, as_graph=as_graph, s3_path=s3_path)
+
+    def to_df(self, node, dedupe=True):
         """Convert node properties to dataframe.
 
         Args:
@@ -77,7 +96,8 @@ class Neo4j:
         filtered = list(filter(lambda n: node in n._labels, self.nodes))
         df = pd.DataFrame([n._properties for n in filtered])
         df["id"] = [n.id for n in filtered]
-        df.drop_duplicates(inplace=True, ignore_index=True)
+        if dedupe:
+            df.drop_duplicates(inplace=True, ignore_index=True)
         return df
 
     def save_data_to_s3(self, bucket, fname, data=None):
