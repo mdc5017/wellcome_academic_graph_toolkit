@@ -23,49 +23,41 @@ class CoAuthorshipGraph(Neo4j):
 
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, cypher_query=None, lookup=None):
+        super().__init__(cypher_query, lookup)
 
         self.coauthorship_nodes = []
         self.coauthorship_edges = {}
         self._researcher_ids = {}
 
     @classmethod
-    def from_publication_ids(cls, publication_ids, max_chunk_size=10000):
+    def from_publication_ids(cls, publication_ids):
         """Initialise coauthorship graph with publications
         from Dimensions IDs and their authors.
 
         Args:
             publication_ids(list): List of Dimensions IDs.
-            max_chunk_size(int): Maximum number of IDs to query per chunk.
 
         """
-        queries = []
-        for i in range(0, len(publication_ids), max_chunk_size):
-            query = f"""
+        query = """
             MATCH (r:Researcher)-[a:AUTHORED]->(p:Publication)
-            WHERE p.dimensions_publication_id IN ['{"','".join(publication_ids[i:i+max_chunk_size])}'] RETURN *
+            WHERE p.dimensions_publication_id IN {} RETURN *
             """
-            queries.append(query)
-        return cls(queries)
+        return cls(query, lookup=publication_ids)
 
     @classmethod
-    def from_researcher_ids(cls, researcher_ids, max_chunk_size=10000):
+    def from_researcher_ids(cls, researcher_ids):
         """Initialise coauthorship graph with publications from Dimensions IDs and their authors.
 
         Args:
             publication_ids(list): List of Dimensions IDs.
-            max_chunk_size(int): Maximum number of IDs to query per chunk.
 
         """
-        queries = []
-        for i in range(0, len(researcher_ids), max_chunk_size):
-            query = f"""
+        query = """
             MATCH (r1:Researcher)-[a1:AUTHORED]->(p:Publication)<-[a2:AUTHORED]-(r2)
-            WHERE r1.dimensions_researcher_id IN ['{"','".join(researcher_ids[i:i+max_chunk_size])}'] RETURN *
+            WHERE r1.dimensions_researcher_id IN {} RETURN *
             """
-            queries.append(query)
-        return cls(queries)
+        return cls(query, lookup=researcher_ids)
 
     def from_file(self, bucket, directory):
         """Load coauthor nodes and edges from files.
