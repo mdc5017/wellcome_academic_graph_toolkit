@@ -41,7 +41,7 @@ class Neo4j:
         result.consume()
         return data
 
-    def query(self, query, parameters=None, db=None, as_graph=True, s3_path=None):
+    def query(self, query, parameters=None, db=None, as_graph=True, s3_path=None, fpath=None):
         """Run provided query and return results as nodes and edges.
 
         Args:
@@ -50,6 +50,7 @@ class Neo4j:
             db(str): Database name.
             as_graph(bool): Whether to return the results as graph or json format.
             s3_path(Optional[str]): Optional path to s3 bucket to save interim query results to.
+            fpath(Optional[str]): Optional path to subdirectories and filename to save query results to
 
         """
         if query is None:
@@ -59,6 +60,10 @@ class Neo4j:
             query = [query]
 
         for i, q in enumerate(tqdm(query)):
+            if fpath:
+                fpath_name = f"{fpath}_{i}"
+            else:
+                fpath_name = i
             session = self._driver.session(database=db)
             try:
                 if as_graph:
@@ -70,13 +75,13 @@ class Neo4j:
                         self._transaction, q, parameters, as_graph=False
                     )
                     if s3_path is not None:
-                        self.save_data_to_s3(bucket=s3_path, fname=i, data=data)
+                        self.save_data_to_s3(bucket=s3_path, fname=fpath_name, data=data)
                     self.data.extend(data)
             finally:
                 session.close()
 
     def lookup_query(
-        self, query, lookup, max_chunk_size=1000, as_graph=False, s3_path=None
+        self, query, lookup, max_chunk_size=1000, as_graph=False, s3_path=None, fpath=None
     ):
         """Run provided lookup query in batches.
 
@@ -93,7 +98,7 @@ class Neo4j:
             lookup_string = "','".join(lookup[i : i + max_chunk_size])
             subquery = query.format(f"['{lookup_string}']")
             queries.append(subquery)
-        self.query(queries, as_graph=as_graph, s3_path=s3_path)
+        self.query(queries, as_graph=as_graph, s3_path=s3_path, fpath=fpath)
 
     def to_df(self, node, dedupe=True):
         """Convert node properties to dataframe.
