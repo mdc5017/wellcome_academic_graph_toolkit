@@ -415,4 +415,4 @@ if __name__ == "__main__":
     years_since_first_pub_viz()
     rep.add_figure(options="width = 70%") 
 
-    rep.write_report()
+    rep.write_report(template_path='simple.html')

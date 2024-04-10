@@ -9,7 +9,7 @@ import multiprocessing
 from io import StringIO
 import numpy as np
 
-sys.path.append("../../toolkit")
+sys.path.append("..")
 from wag_toolkit.utils import Neo4j
 from currency_converter import CurrencyConverter
 
@@ -34,7 +34,7 @@ class CareerStage(Neo4j):
 
         # paths to directories to save query ouputs
         self.pub_ids_path = "dimensions/careers/pub_ids"
-        self.batches_researchers_path = "dimensions/careers/pub_ids_batches/researchers"
+        self.batches_researchers_path = "dimensions/careers/pub_ids_batches_new/researchers"
         self.researchers_adam_path = "dimensions/careers/grant_info_adam.csv"
         self.researchers_collated_path = "dimensions/careers/researchers_collated.csv"
         self.researchers_processed_path = "dimensions/careers/researchers_processed.csv"
@@ -61,15 +61,16 @@ class CareerStage(Neo4j):
         Loads all publications related to DR from saved csv file
         """
         tqdm.pandas()
-        self.load_FOR_hierarchy()
+        # self.load_FOR_hierarchy()
 
         print("loading DR pub ids from s3", end="")
         s3 = boto3.client("s3")
         csv_file = s3.get_object(Bucket=self.bucket, Key=self.pub_ids_path)
         content = csv_file["Body"].read().decode("utf-8")
         lines = content.strip().split("\n")[1:]
-        self.pubs_id = {line.split(",")[1] for line in lines}
+
         self.pubs_info = pd.read_csv(StringIO(content))
+        self.pubs_id = self.pubs_info['dimensions_publication_id']
 
     def load_DR_scheme_mapping(self):
         """
