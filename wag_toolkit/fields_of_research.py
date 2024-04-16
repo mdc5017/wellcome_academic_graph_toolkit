@@ -18,8 +18,8 @@ class CitationFoRGraph(Neo4j, VisJS):
 
     """
 
-    def __init__(self, cypher_query=None, graph=True, s3_path=None):
-        Neo4j.__init__(self, cypher_query, graph, s3_path)
+    def __init__(self, cypher_query=None, lookup=None, graph=True, s3_path=None):
+        Neo4j.__init__(self, cypher_query, lookup, graph, s3_path)
         VisJS.__init__(self)
 
         self.node_source = "publications"
@@ -28,28 +28,24 @@ class CitationFoRGraph(Neo4j, VisJS):
         self.adjacency_matrices = {}
 
     @classmethod
-    def from_publication_ids(cls, publication_ids, max_chunk_size=10000, s3_path=None):
+    def from_publication_ids(cls, publication_ids, s3_path=None):
         """Initialise Field of Research graph with publications
         from Dimensions IDs and their cited publications.
 
         Args:
             publication_ids(list): List of Dimensions IDs.
-            max_chunk_size(int): Maximum number of IDs to query per chunk.
             s3_path(Optional[str]): Path to S3 bucket (including subdirectories) to back up query results to.
 
         """
-        queries = []
-        for i in range(0, len(publication_ids), max_chunk_size):
-            query = f"""
+        query = """
             MATCH (f1:FieldOfResearch)<-[r1:RESEARCH_WITHIN]-(p1:Publication)-[:CITED_BY]->(p2:Publication)-[r2:RESEARCH_WITHIN]->(f2:FieldOfResearch)
-            WHERE SIZE(f1.id)>2 AND SIZE(f2.id)>2 AND p2.dimensions_publication_id IN ['{"','".join(publication_ids[i:i+max_chunk_size])}']
+            WHERE SIZE(f1.id)>2 AND SIZE(f2.id)>2 AND p2.dimensions_publication_id IN {}
             RETURN f2.name AS citing_for,f2.id AS citing_for_id,f1.name AS cited_for,f1.id AS cited_for_id, p2.year AS year, EXISTS {{
             MATCH (i)-[:FUNDED]->(p2)
             WHERE i.name='Wellcome Trust'
             }} AS Wellcome
             """
-            queries.append(query)
-        return cls(cypher_query=queries, graph=False, s3_path=s3_path)
+        return cls(cypher_query=query, lookup=publication_ids, graph=False, s3_path=s3_path)
 
     def adjacency_matrix_from_citations(self, year, funder=None):
         """Calculate adjacency matrix for a given year based on citations between fields.
@@ -102,8 +98,8 @@ class AuthorFoRGraph(CoAuthorshipGraph, VisJS):
 
     """
 
-    def __init__(self):
-        CoAuthorshipGraph.__init__(self)
+    def __init__(self, cypher_query=None, lookup=None):
+        CoAuthorshipGraph.__init__(self, cypher_query, lookup)
         VisJS.__init__(self)
 
         self.node_source = "authors"
@@ -127,17 +123,14 @@ class AuthorFoRGraph(CoAuthorshipGraph, VisJS):
         """
         self.for_data = []
         self.data = []
-        queries = []
         researcher_ids = self.coauthorship_nodes["dimensions_researcher_id"].tolist()
-        for i in range(0, len(researcher_ids), chunk_size):
-            query = f"""
+        query = """
             MATCH (r:Researcher)-[:AUTHORED]-(p:Publication)-[:RESEARCH_WITHIN]-(f:FieldOfResearch)
-            WHERE r.dimensions_researcher_id IN ['{"','".join(researcher_ids[i:i+chunk_size])}']
+            WHERE r.dimensions_researcher_id IN {}
             AND SIZE(f.id)>2
             RETURN r.dimensions_researcher_id AS researcher, f.name AS for, p.year as year;
             """
-            queries.append(query)
-        self.query(query=queries, as_graph=False, s3_path=s3_path)
+        self.lookup_query(query=query, lookup=researcher_ids, max_chunk_size=chunk_size, as_graph=False, s3_path=s3_path)
         self.for_data.extend(self.data)
         self.for_data = pd.DataFrame(self.for_data)
 
@@ -153,17 +146,14 @@ class AuthorFoRGraph(CoAuthorshipGraph, VisJS):
 
         """
         self.data = []
-        queries = []
         researcher_ids = self.coauthorship_nodes["dimensions_researcher_id"].tolist()
-        for i in range(0, len(researcher_ids), chunk_size):
-            query = f"""
+        query = f"""
             MATCH (f:Institution)-[:FUNDED]->(g:Grant)-[:AWARDED_TO]->(r:Researcher)
-            WHERE r.dimensions_researcher_id IN ['{"','".join(researcher_ids[i:i+chunk_size])}']
+            WHERE r.dimensions_researcher_id IN {{}}
                 AND f.name ='{funder_name}'
             RETURN r.dimensions_researcher_id AS researcher, g.start_date AS start_date, g.end_date AS end_date
             """
-            queries.append(query)
-        self.query(query=queries, as_graph=False, s3_path=s3_path)
+        self.lookup_query(query=query, lookup=researcher_ids, as_graph=False, s3_path=s3_path)
         df = pd.DataFrame(self.data)
         df["end_date"].fillna("2100", inplace=True)
         df["end_date"] = pd.to_datetime(df["end_date"])
