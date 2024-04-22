@@ -7,8 +7,8 @@ if __name__ == "__main__":
     """
     career_stage = CareerStage()
     # career_stage.career_info_adam()
-    career_stage.career_info_wac()
+    # career_stage.career_info_wac()
 
-    # career_stage.collate_career_info()
-    # career_stage.process_career_info()
-    # career_stage.process_career_info_exploded()
+    career_stage.collate_career_info()
+    career_stage.process_career_info()
+    career_stage.process_career_info_exploded()

@@ -34,7 +34,7 @@ class CareerStage(Neo4j):
 
         # paths to directories to save query ouputs
         self.pub_ids_path = "dimensions/careers/pub_ids"
-        self.batches_researchers_path = "dimensions/careers/pub_ids_batches_new/researchers"
+        self.batches_researchers_path = "dimensions/careers/pub_ids_batches_test/researchers"
         self.researchers_adam_path = "dimensions/careers/grant_info_adam.csv"
         self.researchers_collated_path = "dimensions/careers/researchers_collated.csv"
         self.researchers_processed_path = "dimensions/careers/researchers_processed.csv"
@@ -67,7 +67,6 @@ class CareerStage(Neo4j):
         s3 = boto3.client("s3")
         csv_file = s3.get_object(Bucket=self.bucket, Key=self.pub_ids_path)
         content = csv_file["Body"].read().decode("utf-8")
-        lines = content.strip().split("\n")[1:]
 
         self.pubs_info = pd.read_csv(StringIO(content))
         self.pubs_id = self.pubs_info['dimensions_publication_id']
@@ -306,9 +305,7 @@ class CareerStage(Neo4j):
         print(f"finding career info related to publications from Adam's links")
 
         pub_query = f"""
-            MATCH (i:Institution)-[:FUNDED]->(g:Grant)-[:AWARDED_TO]->(r:Researcher)-[rel:AUTHORED]->(p:Publication)
-            WHERE p.dimensions_publication_id IN ['{"','".join(pub_ids)}']
-            MATCH (i:Institution)-[:FUNDED]->(p:Publication)
+            OPTIONAL MATCH (i:Institution)-[:FUNDED]->(g:Grant)-[:AWARDED_TO]->(r:Researcher)-[rel:AUTHORED]->(p:Publication)
             WHERE p.dimensions_publication_id IN ['{"','".join(pub_ids)}']
             RETURN
             p.dimensions_publication_id as dimensions_publication_id,
@@ -380,6 +377,27 @@ class CareerStage(Neo4j):
                 g.title AS grant_title,
                 g.for AS grant_FOR,
                 g.start_date AS grant_start_date,
+                i.name AS funder
+                UNION
+                MATCH (i:Institution)-[:FUNDED]->(p:Publication)
+                WHERE p.dimensions_publication_id IN ['{"','".join(pub_ids)}']
+                AND i.name IN ['Wellcome Trust', 'The Francis Crick Institute', 'Medical Research Council', 'National Institute for Health Research']
+                RETURN
+                p.dimensions_publication_id as dimensions_publication_id,
+                p.relative_citation_ratio as RCR,
+                p.for as pub_FOR,
+                p.date as date,
+                p.year as year,
+                null AS dimensions_researcher_id,
+                null AS first_name,
+                null AS last_name,
+                null AS author_position,
+                null AS dimensions_grant_id,
+                null AS funding_amount,
+                null AS funding_currency,
+                null AS grant_title,
+                null AS grant_FOR,
+                null AS grant_start_date,
                 i.name AS funder;
                 """,
                 as_graph=False,
