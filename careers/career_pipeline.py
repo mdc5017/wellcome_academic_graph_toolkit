@@ -12,6 +12,7 @@ import numpy as np
 sys.path.append("..")
 from wag_toolkit.utils import Neo4j
 from currency_converter import CurrencyConverter
+from boto3.s3.transfer import TransferConfig
 
 
 class CareerStage(Neo4j):
@@ -34,14 +35,13 @@ class CareerStage(Neo4j):
 
         # paths to directories to save query ouputs
         self.pub_ids_path = "dimensions/careers/pub_ids"
-        self.batches_researchers_path = "dimensions/careers/pub_ids_batches_test/researchers"
+        self.batches_researchers_path = "dimensions/careers/pub_ids_batches_by_year/researchers"
         self.researchers_adam_path = "dimensions/careers/grant_info_adam.csv"
         self.researchers_collated_path = "dimensions/careers/researchers_collated.csv"
         self.researchers_processed_path = "dimensions/careers/researchers_processed.csv"
         self.researchers_exploded_path = "dimensions/careers/exploded_career_data/researchers_exploded"
         
         # variables
-        
         self.RCR_log_threshold = 2.1
 
 
@@ -337,29 +337,23 @@ class CareerStage(Neo4j):
         pd.DataFrame(career_info_adam).to_csv("grant_info_adam.csv")
         s3.upload_file("grant_info_adam.csv", self.bucket, self.researchers_adam_path)
 
-    def career_info_wac(self, chunk_size=10000):
+    def career_info_wac(self):
         """
         retrieve career info for researchers working in FOR of interest
         """
         self.data = []
 
         # load pub ids
-        self.load_pub_ids()
-        pub_ids = list(self.pubs_id)
-
-        chunks = [
-            pub_ids[i : i + chunk_size] for i in range(0, len(pub_ids), chunk_size)
-        ]
-        pool_chunks = [(chunks[i], i) for i in range(0, len(chunks))]
+        years = list(range(2002, 2024)) 
 
         global researchers_from_pub_ids
 
-        def researchers_from_pub_ids(pub_ids, idx):
+        def researchers_from_pub_ids(year):
             neo = Neo4j()
             neo.query(
                 f"""
                 OPTIONAL MATCH (i:Institution)-[:FUNDED]->(g:Grant)-[:AWARDED_TO]->(r:Researcher)-[rel:AUTHORED]->(p:Publication)
-                WHERE p.dimensions_publication_id IN ['{"','".join(pub_ids)}']
+                WHERE p.year = {year}
                 AND i.name IN ['Wellcome Trust', 'The Francis Crick Institute', 'Medical Research Council', 'National Institute for Health Research']
                 RETURN
                 p.dimensions_publication_id as dimensions_publication_id,
@@ -380,7 +374,7 @@ class CareerStage(Neo4j):
                 i.name AS funder
                 UNION
                 MATCH (i:Institution)-[:FUNDED]->(p:Publication)
-                WHERE p.dimensions_publication_id IN ['{"','".join(pub_ids)}']
+                WHERE p.year = {year}
                 AND i.name IN ['Wellcome Trust', 'The Francis Crick Institute', 'Medical Research Council', 'National Institute for Health Research']
                 RETURN
                 p.dimensions_publication_id as dimensions_publication_id,
@@ -402,12 +396,12 @@ class CareerStage(Neo4j):
                 """,
                 as_graph=False,
                 s3_path="datalabs-data",
-                fpath=f"{self.batches_researchers_path}_{idx}",
+                fpath=f"{self.batches_researchers_path}_{year}",
             )
-            print(f"finished batch {idx}")
+            print(f"finished batch for year {year}")
 
         pool = multiprocessing.Pool(processes=10)
-        pool.starmap(researchers_from_pub_ids, pool_chunks)
+        pool.map(researchers_from_pub_ids, years)
         # Close the Pool to release resources
         pool.close()
         pool.join()
@@ -742,6 +736,10 @@ class CareerStage(Neo4j):
             "RCR"
         ].progress_apply(lambda x: np.nanmedian(x))
 
+        # Set the desired multipart threshold value (5GB)
+        GB = 1024 ** 3
+        config = TransferConfig(multipart_threshold=5*GB)
+
         # save to s3
         s3 = boto3.client("s3")
         self.career_data_exploded.to_csv("career_data_exploded.csv", index=False)
@@ -749,4 +747,5 @@ class CareerStage(Neo4j):
             "career_data_exploded.csv",
             self.bucket,
             self.researchers_exploded_path + ".csv",
+            Config=config,
         )
