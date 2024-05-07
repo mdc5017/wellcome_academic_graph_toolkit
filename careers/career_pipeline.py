@@ -565,15 +565,28 @@ class CareerStage(Neo4j):
             "RCR_log"
         ].progress_apply(lambda x: x >= self.RCR_log_threshold)
 
+        # # Set the desired multipart threshold value (5GB)
+        GB = 1024 ** 3
+        config = TransferConfig(multipart_threshold=5*GB)
 
-        # save data to s3
-        print("saving to s3")
-        csv_buffer = StringIO()
-        career_data.to_csv(csv_buffer, index=False)
-        s3_resource = boto3.resource("s3")
-        s3_resource.Object(self.bucket, self.researchers_processed_path).put(
-            Body=csv_buffer.getvalue()
+        # save to s3
+        s3 = boto3.client("s3")
+        career_data.to_csv("career_data_processed.csv", index=False)
+        s3.upload_file(
+            "career_data_processed.csv",
+            self.bucket,
+            self.researchers_processed_path + ".csv",
+            Config=config,
         )
+
+        # # save data to s3
+        # print("saving to s3")
+        # csv_buffer = StringIO()
+        # career_data.to_csv(csv_buffer, index=False)
+        # s3_resource = boto3.resource("s3")
+        # s3_resource.Object(self.bucket, self.researchers_processed_path).put(
+        #     Body=csv_buffer.getvalue()
+        # )
 
     def process_career_info_exploded(self):
         """
