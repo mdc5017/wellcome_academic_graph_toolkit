@@ -5,8 +5,8 @@ from datetime import datetime
 from dateutil import parser
 
 from tqdm import tqdm
-import multiprocessing
-from io import StringIO
+import multiprocess as mp
+from io import StringIO, BytesIO
 import numpy as np
 
 sys.path.append("..")
@@ -26,17 +26,18 @@ class CareerStage(Neo4j):
         self.bucket = "datalabs-data"
 
         # paths to existing data sources
-        self.DR_pub_grant_links_path = (
-            "funding_impact_measures/dr_grants/dr_pub_grant_links.xlsx"
-        )
+        # self.DR_pub_grant_links_path = (
+        #     "funding_impact_measures/dr_grants/dr_pub_grant_links.xlsx"
+        # )
         self.FOR_hierarchy_directory_path = "dimensions/careers/anzsrc2020.csv"
-        self.DR_schemes_mapping_path = "dimensions/careers/DRscheme_mapping.xlsx"
+        # self.DR_schemes_mapping_path = "dimensions/careers/DRscheme_mapping.xlsx"
+        self.DR_grants_and_pubs_path = "dimensions/careers/all_grants_pubs.xlsx"
         self.DR_grant_categories_path = "funding_impact_measures/dr_grants/award_list_legacy.xlsx"
 
         # paths to directories to save query ouputs
         self.pub_ids_path = "dimensions/careers/pub_ids"
         self.batches_researchers_path = "dimensions/careers/pub_ids_batches_by_year/researchers"
-        self.researchers_adam_path = "dimensions/careers/grant_info_adam.csv"
+        self.DR_grants_pubs_path = "dimensions/careers/DR_grants_pubs.csv"
         self.researchers_collated_path = "dimensions/careers/researchers_collated.csv"
         self.researchers_processed_path = "dimensions/careers/researchers_processed.csv"
         self.researchers_exploded_path = "dimensions/careers/exploded_career_data/researchers_exploded"
@@ -51,9 +52,13 @@ class CareerStage(Neo4j):
         """
         print("loading DR grant to pub mappings from s3", end="")
         s3 = boto3.client("s3")
-        excel_file = s3.get_object(Bucket=self.bucket, Key=self.DR_pub_grant_links_path)
+        excel_file = s3.get_object(Bucket=self.bucket, Key=self.DR_grants_and_pubs_path)
         self.DR_pub_grant_links = pd.read_excel(excel_file["Body"].read())
-        self.DR_pub_ids = set(self.DR_pub_grant_links["id"])
+        self.DR_pub_ids = set(self.DR_pub_grant_links["pub_id"])
+        # only keep pub_ids that are a string
+        self.DR_pub_ids = [x for x in self.DR_pub_ids if isinstance(x, str)]
+        self.DR_grant_ids = set(self.DR_pub_grant_links["grant_id"])
+        self.DR_grant_ids = [x for x in self.DR_grant_ids if isinstance(x, str)]
         print("... finished")
 
     def load_pub_ids(self):
@@ -102,15 +107,17 @@ class CareerStage(Neo4j):
         )
         print("... finished")
 
-    def load_career_info_adam(self):
+    def load_DR_grants_pubs(self):
         """
         Loads all publications related to DR from saved csv file
         """
         print("loading grant_info from s3", end="")
         s3 = boto3.client("s3")
-        csv_file = s3.get_object(Bucket=self.bucket, Key=self.researchers_adam_path)
-        content = csv_file["Body"].read().decode("utf-8")
-        self.career_info_adam = pd.read_csv(StringIO(content))
+        parquet_file = s3.get_object(Bucket=self.bucket, Key=self.DR_grants_pubs_path)
+        content = parquet_file['Body'].read()
+
+        self.DR_grants_pubs = pd.read_parquet(BytesIO(content))
+
 
         print("... finished")
 
@@ -234,7 +241,8 @@ class CareerStage(Neo4j):
                     RETURN
                     p.dimensions_publication_id as dimensions_publication_id,
                     p.for as pub_FOR,
-                    p.relative_citation_ratio as RCR;
+                    p.year as year,
+                    p.relative_citation_ratio as RCR
                     """
             queries.append(query)
 
@@ -246,100 +254,81 @@ class CareerStage(Neo4j):
         self.pubs_info = pd.DataFrame(self.data)
 
         # resolve FOR to their super group
-        self.pubs_info["pub_FOR"] = self.pubs_info["pub_FOR"].apply(
-            lambda x: eval(x).split(" ") if isinstance(x, str) else []
-        )
+        # self.pubs_info["pub_FOR"] = self.pubs_info["pub_FOR"].apply(
+        #     lambda x: eval(x).split(" ") if isinstance(x, str) else []
+        # )
 
-        print("resolve FOR to super group")
-        self.pubs_info["pub_FOR_super"] = self.pubs_info["pub_FOR"].progress_apply(
-            lambda x: set([self.FOR_hierarchy[y] for y in x if y in self.FOR_hierarchy])
-        )
+        # print("resolve FOR to super group")
+        # self.pubs_info["pub_FOR_super"] = self.pubs_info["pub_FOR"].progress_apply(
+        #     lambda x: set([self.FOR_hierarchy[y] for y in x if y in self.FOR_hierarchy])
+        # )
 
         print("... finished")
 
-        pd.DataFrame(self.pubs_info).to_csv("pubs_ids.csv", index=False)
-        s3.upload_file("pubs_ids.csv", self.bucket, self.pub_ids_path)
+        pd.DataFrame(self.pubs_info).to_parquet("pubs_ids.parquet")
+        s3.upload_file("pubs_ids.parquet", self.bucket, self.pub_ids_path)
 
-    def career_info_adam(self):
+    def career_info_DR(self):
         """
         retrieve career info for researchers working on publications
-        from Adam's DR grants-publication mapping
+        from the DR grants-publication mapping
         """
         self.load_DR_pub_grant_links()
-        DR_pub_grant_links = self.DR_pub_grant_links
-
-        grant_ids = list(DR_pub_grant_links["grant_id"].unique())
-        pub_ids = list(DR_pub_grant_links["id"].unique())
 
         # do a query to get all the information related to grants
-        print(f"finding career info related to grants from Adam's links")
-
-        grant_query = f"""
-            OPTIONAL MATCH (i:Institution)-[:FUNDED]->(g:Grant)-[:AWARDED_TO]->(r:Researcher)-[rel:AUTHORED]->(p:Publication)
-            WHERE g.dimensions_grant_id IN ['{"','".join([str(grant_id) for grant_id in grant_ids])}']
-            RETURN
-            p.dimensions_publication_id as dimensions_publication_id,
-            p.relative_citation_ratio as RCR,
-            p.for as pub_FOR,
-            p.date as date,
-            p.year as year,
-            r.dimensions_researcher_id AS dimensions_researcher_id,
-            r.first_name AS first_name,
-            r.last_name AS last_name,
-            rel.position AS author_position,
-            g.dimensions_grant_id as dimensions_grant_id,
-            g.funding_amount AS funding_amount,
-            g.funding_currency AS funding_currency,
-            g.title AS grant_title,
-            g.for AS grant_FOR,
-            g.start_date AS grant_start_date,
-            i.name AS funder;
-            """
-
-        self.query(query=grant_query, as_graph=False)
-        grant_df = pd.DataFrame(self.data)
-
-        self.data = []
-
-        # do a query to get all information related to publications
-        print(f"finding career info related to publications from Adam's links")
+        print(f"finding career info related to grants and publications from DR")
 
         pub_query = f"""
-            OPTIONAL MATCH (i:Institution)-[:FUNDED]->(g:Grant)-[:AWARDED_TO]->(r:Researcher)-[rel:AUTHORED]->(p:Publication)
-            WHERE p.dimensions_publication_id IN ['{"','".join(pub_ids)}']
+            MATCH (r:Researcher)-[rel:AUTHORED]->(p:Publication)
+            WHERE p.dimensions_publication_id IN ['{"','".join(self.DR_pub_ids)}']
             RETURN
             p.dimensions_publication_id as dimensions_publication_id,
             p.relative_citation_ratio as RCR,
             p.for as pub_FOR,
-            p.date as date,
             p.year as year,
             r.dimensions_researcher_id AS dimensions_researcher_id,
             r.first_name AS first_name,
             r.last_name AS last_name,
-            rel.position AS author_position,
-            g.dimensions_grant_id as dimensions_grant_id,
-            g.funding_amount AS funding_amount,
-            g.funding_currency AS funding_currency,
-            g.title AS grant_title,
-            g.for AS grant_FOR,
-            g.start_date AS grant_start_date,
-            i.name AS funder;
+            rel.position AS author_position;
             """
 
         self.query(query=pub_query, as_graph=False)
         pub_df = pd.DataFrame(self.data)
 
-        career_info_adam = pd.concat([grant_df, pub_df], ignore_index=True)
-        career_info_adam = career_info_adam.drop_duplicates()
+        self.data = []
 
+        grant_query = f"""
+            MATCH (g:Grant)
+            WHERE g.dimensions_grant_id IN ['{"','".join(self.DR_grant_ids)}']
+            RETURN
+            g.dimensions_grant_id as dimensions_grant_id,
+            g.funding_amount AS funding_amount,
+            g.funding_currency AS funding_currency,
+            g.title AS grant_title,
+            g.for AS grant_FOR,
+            g.start_date AS grant_start_date;
+            """
+
+        self.query(query=grant_query, as_graph=False)
+        grant_df = pd.DataFrame(self.data)
+
+
+        DR_pub_grants = pd.concat([grant_df, pub_df], ignore_index=True)
+        DR_pub_grants = DR_pub_grants.drop_duplicates()
+
+        DR_pub_grants = self.DR_pub_grant_links.join(pub_df.set_index("dimensions_publication_id"), on="pub_id", how='left')
+        DR_pub_grants = DR_pub_grants.join(grant_df.set_index("dimensions_grant_id"), on="grant_id", how='left')
+
+        # add a funder column with "DR" as funder name
+        DR_pub_grants["funder"] = "DR"
         # save to s3
         s3 = boto3.client("s3")
-        pd.DataFrame(career_info_adam).to_csv("grant_info_adam.csv")
-        s3.upload_file("grant_info_adam.csv", self.bucket, self.researchers_adam_path)
+        pd.DataFrame(DR_pub_grants).to_parquet("DR_pub_grants.parquet")
+        s3.upload_file("DR_pub_grants.parquet", self.bucket, self.DR_grants_pubs_path)
 
     def career_info_wac(self):
         """
-        retrieve career info for researchers working in FOR of interest
+        retrieve career info for researchers working in FOR of interest and for funders of interest
         """
         self.data = []
 
@@ -349,10 +338,11 @@ class CareerStage(Neo4j):
         global researchers_from_pub_ids
 
         def researchers_from_pub_ids(year):
+            print(f"starting batch for year {year}")
             neo = Neo4j()
             neo.query(
                 f"""
-                OPTIONAL MATCH (i:Institution)-[:FUNDED]->(g:Grant)-[:AWARDED_TO]->(r:Researcher)-[rel:AUTHORED]->(p:Publication)
+                MATCH (i:Institution)-[:FUNDED]->(g:Grant)-[:AWARDED_TO]->(r:Researcher)-[rel:AUTHORED]->(p:Publication)
                 WHERE p.year = {year}
                 AND i.name IN ['Wellcome Trust', 'The Francis Crick Institute', 'Medical Research Council', 'National Institute for Health Research']
                 RETURN
@@ -400,7 +390,7 @@ class CareerStage(Neo4j):
             )
             print(f"finished batch for year {year}")
 
-        pool = multiprocessing.Pool(processes=10)
+        pool = mp.Pool(processes=10)
         pool.map(researchers_from_pub_ids, years)
         # Close the Pool to release resources
         pool.close()
@@ -408,23 +398,29 @@ class CareerStage(Neo4j):
 
     def collate_career_info(self):
         """
-        merge all researcher .json outputs from extracted from the graph and adams grant-publication map
+        merge all researcher .json outputs from extracted from the graph and DR grant-publication map
         """
         tqdm.pandas()
 
         self.data = []
-        print(f"loading grant-pub links from Adam's sheet")
-        self.load_career_info_adam()
+        print(f"loading grant-pub links from DR sheet")
+        self.load_DR_grants_pubs()
         print(f"loading career info as generated by process_career_info")
         self.load_data_from_s3(self.bucket, self.batches_researchers_path)
 
         career_data = pd.DataFrame(self.data)
         print(f"found {len(career_data)} matches in the graph")
-        print(f"found {len(self.career_info_adam)} matches in Adam's sheet")
-        career_data = pd.concat([career_data, self.career_info_adam], ignore_index=True)
-        print(f"found {len(career_data)} matches after joining")
-        career_data = career_data.dropna(subset=["dimensions_researcher_id"])
-        print(f"found {len(career_data)} matches that have a researcher linked to it")
+        print(f"found {len(self.DR_grants_pubs)} matches from DR")
+
+        # clean up the DR data
+        self.DR_grants_pubs = self.DR_grants_pubs.rename({'pub_id': 'dimensions_publication_id', 'grant_id': 'dimensions_grant_id'}, axis=1)
+        # now drop the columns that are not in career_data
+        self.DR_grants_pubs = self.DR_grants_pubs.drop(columns = list(set(self.DR_grants_pubs.columns) - set(career_data.columns)))
+
+        career_data = pd.concat([career_data, self.DR_grants_pubs], ignore_index=True)
+        print(f"found {len(career_data)} researchers after joining")
+        # career_data = career_data.dropna(subset=["dimensions_researcher_id"])
+        # print(f"found {len(career_data)} matches that have a researcher linked to it")
 
         # convert amounts to USD
         c2c = CurrencyConverter()
@@ -435,22 +431,22 @@ class CareerStage(Neo4j):
             except ValueError:
                 return None
 
-        # some pubs are duplicated because more than one grant, so add all funding amount and deduplicate
-        career_data["funding_amount_usd"] = career_data.progress_apply(
-            lambda x: convert_item_to_usd(x.funding_amount, x.funding_currency), axis=1
-        )
+        # # some pubs are duplicated because more than one grant, so add all funding amount and deduplicate
+        # career_data["funding_amount_usd"] = career_data.progress_apply(
+        #     lambda x: convert_item_to_usd(x.funding_amount, x.funding_currency), axis=1
+        # )
 
-        pub_funding = (
-            career_data[["dimensions_publication_id", "funding_amount_usd"]]
-            .groupby(by="dimensions_publication_id")
-            .agg(sum)
-        )
-        pub_id2pub_funding = pd.Series(
-            pub_funding.funding_amount_usd.values, index=pub_funding.index
-        ).to_dict()
-        career_data["funding_amount_usd"] = career_data[
-            "dimensions_publication_id"
-        ].map(pub_id2pub_funding)
+        # pub_funding = (
+        #     career_data[["dimensions_publication_id", "funding_amount_usd"]]
+        #     .groupby(by="dimensions_publication_id")
+        #     .agg(sum)
+        # )
+        # pub_id2pub_funding = pd.Series(
+        #     pub_funding.funding_amount_usd.values, index=pub_funding.index
+        # ).to_dict()
+        # career_data["funding_amount_usd"] = career_data[
+        #     "dimensions_publication_id"
+        # ].map(pub_id2pub_funding)
 
         career_data = career_data.drop_duplicates(
             subset=["dimensions_publication_id", "dimensions_grant_id", "dimensions_researcher_id"],
@@ -460,11 +456,16 @@ class CareerStage(Neo4j):
         self.data = []
 
         # save data to s3
-        csv_buffer = StringIO()
-        career_data.to_csv(csv_buffer, index=False)
+        parquet_buffer = BytesIO()
+        career_data.to_parquet(parquet_buffer, index=False)
+
+        # Reset the buffer position to the start
+        parquet_buffer.seek(0)
+
+        # Save data to S3
         s3_resource = boto3.resource("s3")
         s3_resource.Object(self.bucket, self.researchers_collated_path).put(
-            Body=csv_buffer.getvalue()
+            Body=parquet_buffer.getvalue()
         )
 
     def process_career_info(self):
