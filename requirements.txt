@@ -65,7 +65,7 @@ tqdm==4.66.3
 traitlets==5.14.1
 typing_extensions==4.9.0
 tzdata==2023.4
-urllib3==2.0.7
+urllib3==2.2.2
 wag_toolkit @ git+https://github.com/wellcometrust/wellcome_academic_graph_toolkit.git@76c108e585cd6a9f92de703b4acf4b00b2f54031
 wcwidth==0.2.13
 zope.interface==6.1
