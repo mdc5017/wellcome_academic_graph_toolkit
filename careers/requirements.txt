@@ -24,7 +24,7 @@ html-reports==0.2.0
 ipykernel==6.29.1
 ipython==8.21.0
 jedi==0.19.1
-Jinja2==3.1.3
+Jinja2==3.1.4
 jmespath==1.0.1
 jupyter_client==8.6.0
 jupyter_core==5.7.1
@@ -59,12 +59,12 @@ scipy==1.12.0
 six==1.16.0
 soupsieve==2.5
 stack-data==0.6.3
-tornado==6.4
+tornado==6.4.1
 tqdm==4.66.3
 traitlets==5.14.1
 typing_extensions==4.9.0
 tzdata==2023.4
-urllib3==2.0.7
+urllib3==2.2.2
 wag_toolkit @ git+https://github.com/wellcometrust/wellcome_academic_graph_toolkit.git@76c108e585cd6a9f92de703b4acf4b00b2f54031
 wcwidth==0.2.13
 zope.interface==6.1
