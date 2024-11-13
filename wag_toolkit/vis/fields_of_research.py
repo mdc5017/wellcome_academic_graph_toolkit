@@ -35,7 +35,7 @@ class VisJS:
         else:
             return []
 
-    def _pct_edge_title(self, f1, f2, adj_matrix):
+    def _format_edge_title(self, f1, f2, adj_matrix, directed):
         """Format edge title to display percentage when hovering over an edge.
 
         Args:
@@ -47,11 +47,14 @@ class VisJS:
             str: Text displayed when hovering over an edge.
 
         """
-        pct = adj_matrix.loc[f1, f2] / adj_matrix.loc[f1, "All"] * 100
-        title = f"{pct:.2f}%"
+        if directed:
+            pct = adj_matrix.loc[f1, f2] / adj_matrix.loc[f1, "All"] * 100
+            title = f"{pct:.2f}%"
+        else:
+            title = f"{f1} - {f2}: {int(adj_matrix.loc[f1, f2]):,}"
         return title
 
-    def _format_node_size(self, for_name, adj_matrix, directed):
+    def _format_node_size(self, for_name, adj_matrix, directed, node_count="All"):
         """Calculate node sizes correctly based on field of research count.
         For citations-based visualisations, both source and cited publication counts are considered.
 
@@ -60,11 +63,12 @@ class VisJS:
             adj_matrix(pd.DataFrame): Adjacency matrix of fields of research.
             directed(bool): Whether the edges are directed (citations-based) or undirected
                 (coauthorship-based).
+            colname(str): Name of column containing total counts.
 
         """
-        total = adj_matrix.loc["All", for_name]
+        total = adj_matrix.loc[node_count, for_name]
         if directed and (for_name in adj_matrix.index):
-            total += adj_matrix.loc[for_name, "All"]
+            total += adj_matrix.loc[for_name, node_count]
         return total
 
     def _format_node_title(self, for_name, total, adj_matrix):
@@ -79,14 +83,14 @@ class VisJS:
             str: Text displayed when hovering over a node.
 
         """
-        title = f"Number of {self.node_source}: {int(total)}"
+        title = f"{for_name}: Number of {self.node_source}: {int(total)}"
         if for_name in adj_matrix.index:
             pct = (
                 adj_matrix.loc[for_name, for_name]
                 / adj_matrix.loc[for_name, "All"]
                 * 100
             )
-            title += f", <b>{pct:.2f}%</b> within-field {self.edge_source}"
+            title += f", <b>{pct:.2f}%</b> within-{self.node_type} {self.edge_source}"
         return title
 
     def _get_node_and_edge_data(
@@ -102,6 +106,7 @@ class VisJS:
         directed,
         weight_edges_by_pct=False,
         funder=None,
+        node_count="All",
     ):
         """Extract nodes and edges from a given adjacency matrix and convert into vis.js format.
 
@@ -118,10 +123,11 @@ class VisJS:
                 (coauthorship-based).
             weight_edges_by_pct(bool): Whether to use counts or percentages to calculate edge widths.
             funder(Optional[str]): Name of funder to filter by.
+            node_count(str): Name of column containing total node counts.
 
         """
         nodes_to_add = set()
-        for f1 in adj_matrix.index.drop("All"):
+        for f1 in adj_matrix.index.drop(list(set(["All", node_count]))):
             for f2, count in adj_matrix.loc[f1].items():
                 if (f2 != f1) and (f2 != "All"):
                     if count <= threshold:
@@ -131,20 +137,18 @@ class VisJS:
                     if funder is not None:
                         if [f1, f2] not in existing_edges:
                             continue
-                    # if not directed:
-                    #    if len(existing_edges) > 0:
-                    #        if set([f1, f2]) in [set(e) for e in existing_edges]:
-                    #            continue
+                    if not directed:
+                        if len(existing_edges) > 0:
+                            if set([f1, f2]) in [set(e) for e in existing_edges]:
+                                continue
 
                     edge_weight = count
                     if weight_edges_by_pct:
                         edge_weight = adj_matrix.loc[f1, f2] / adj_matrix.loc[f1, "All"]
 
-                    edge_title = self._pct_edge_title(
-                        f1=f1, f2=f2, adj_matrix=adj_matrix
+                    edge_title = self._format_edge_title(
+                        f1=f1, f2=f2, adj_matrix=adj_matrix, directed=directed
                     )
-                    if not directed:
-                        edge_title = str(int(count))
 
                     edge = self._add_edge(
                         from_node=f1,
@@ -165,7 +169,10 @@ class VisJS:
 
         for n in nodes_to_add:
             total = self._format_node_size(
-                for_name=n, adj_matrix=adj_matrix, directed=directed
+                for_name=n,
+                adj_matrix=adj_matrix,
+                directed=directed,
+                node_count=node_count,
             )
             title = self._format_node_title(
                 for_name=n, total=total, adj_matrix=adj_matrix
@@ -207,6 +214,7 @@ class VisJS:
         funder_edge_scaling=None,
         weight_edges_by_pct=False,
         directed=False,
+        node_count="All",
     ):
         """Sets up JSON structure of nodes and edges for field of research interaction visualisation using vis.js.
         For specific formatting options, take a look at the vis.js documentation:
@@ -253,6 +261,7 @@ class VisJS:
                     font=font,
                     weight_edges_by_pct=weight_edges_by_pct,
                     directed=directed,
+                    node_count=node_count,
                 )
             get_node_and_edge_data(
                 adj_matrix=self.adjacency_matrices[year]["All"],
