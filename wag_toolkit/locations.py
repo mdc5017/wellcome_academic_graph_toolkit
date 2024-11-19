@@ -118,6 +118,12 @@ class Locations(Neo4j, VisJS):
             if isinstance(g, str):
                 if g == "[nan]":
                     cleaned_grid_ids.append([None])
+                elif len(g.split(' '))>1:
+                    cleaned = [
+                        cg.strip().replace("'", "")
+                        for cg in g.replace("['", "").replace("']", "").replace("\n", " ").split(" ")
+                    ]
+                    cleaned_grid_ids.append(cleaned)
                 else:
                     cleaned = [
                         cg.strip()

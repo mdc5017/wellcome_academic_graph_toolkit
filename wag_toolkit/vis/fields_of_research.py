@@ -416,11 +416,12 @@ class VisJS:
 
     def to_visjs(
         self,
+        dirname,
         nodes_metadata=None,
         edges_metadata=None,
         directed=True,
         template=None,
-        vis_name=None,
+        vis_name=None
     ):
         """Create interactive visualisation of field of research network in vis.js.
         See here for global visualisation options: https://visjs.github.io/vis-network/docs/network/#options.
@@ -445,8 +446,8 @@ class VisJS:
             edges_metadata["arrowStrikethrough"] = False
         options = self._set_global_options(nodes_metadata, edges_metadata)
 
-        new_dirname = datetime.now().isoformat()
-        os.makedirs(new_dirname)
+        new_dirname = dirname
+        os.makedirs(new_dirname, exist_ok=True)
         self._to_json(Path(new_dirname) / "nodes.json", self.vis_nodes)
         self._to_json(Path(new_dirname) / "edges.json", self.vis_edges)
         self._to_json(Path(new_dirname) / "options.json", options)
