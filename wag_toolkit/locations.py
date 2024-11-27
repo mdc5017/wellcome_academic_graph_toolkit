@@ -65,13 +65,16 @@ class Locations(Neo4j, VisJS):
             query_add = ""
         for i in range(0, len(grid_ids), max_chunk_size):
             query = f"""
-            MATCH (i:Institution)-[:LOCATED_IN]->(c:{location_level.capitalize()})
+            MATCH (i:Institution)
             WHERE i.grid_id IN ['{"','".join(grid_ids[i:i+max_chunk_size])}']
-            RETURN i.grid_id AS grid_id, c.{location_level} AS name {query_add}
+            RETURN i.grid_id AS grid_id, i.{location_level} AS name {query_add}
             """
             queries.append(query)
         self.query(query=queries, as_graph=False)
         df = pd.DataFrame(self.data)
+        df['name'] = df['name'].str.replace(r"('([^']+)')(, '\2')+", r"\1", regex=True)
+        df['name'] = df['name'].str.strip("[']")
+        df['name'] = df['name'].str.replace('"', "'")
         return df
 
     def institution_lookup(
