@@ -1,0 +1,209 @@
+<html>
+    <head>
+    <script src='https://cdn.plot.ly/plotly-2.27.0.min.js'></script>
+	<script src='https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js'></script>
+
+    </head>
+
+
+    <body>
+        <div style="position:fixed; z-index:100; background-color: white; width: 100%; top: 0;">
+            <label style="font-family:Helvetica">
+                Select year
+                <div class="slidecontainer">
+                    <input type="range" min="2013" max="2023" value="2022" class="slider" id="slider">
+                    <span id="sliderValueDisplay"></span>
+                </div>
+            </label>
+            <br />
+            <label style="font-family:Helvetica">
+                Select scheme
+                <div>
+                    <label>
+                    <select id="schemeFilter">
+                        <option value="All">All</option>
+                        <option value="Career Development Award">Career Development Award</option>
+                        <option value="Directed">Directed</option>
+                        <option value="Discovery Award">Discovery Award</option>
+                        <option value="Early-Career Award">Early-Career Award</option>
+                    </select>
+                    </label>
+                </div>
+            </label>
+            <br />
+            <label class="switch" style="font-family:Helvetica">
+                Show as %
+                <input type="checkbox", id="toggle">
+                <span class="slider round"></span>
+            </label>
+            <br />
+            <br />
+        </div>
+        <div style="height: 120px;"></div>
+        <div id="barchart1"><!-- Plotly chart will be drawn inside this DIV --></div>
+        <div style="height: 20px;"></div>
+        <div id="barchart2"><!-- Plotly chart will be drawn inside this DIV --></div>
+        <div style="height: 20px;"></div>
+        <div id="barchart3"><!-- Plotly chart will be drawn inside this DIV --></div>
+        <div style="height: 20px;"></div>
+        <div id="barchart4"><!-- Plotly chart will be drawn inside this DIV --></div>
+        <div style="height: 20px;"></div>
+        <div id="barchart5"><!-- Plotly chart will be drawn inside this DIV --></div>
+
+        <script type="module">
+
+             // Handler event when slider changes
+             document.getElementById('slider').oninput = function() {
+                // Get the value of the slider and store it
+                var sliderValue = this.value;
+
+                Plotly.react('barchart1', uk_data[sliderValue], layout1);
+                Plotly.react('barchart2', lmic_data[sliderValue], layout2);
+                Plotly.react('barchart3', lmic_wellcome[sliderValue], layout3)
+                Plotly.react('barchart4', lmic_grant[sliderValue], layout4)
+                Plotly.react('barchart5', grant_lmic_data[sliderValue], layout5)
+
+                // Display the selected value next to slider
+                document.getElementById('sliderValueDisplay').innerHTML = sliderValue;
+
+            }
+
+            console.log(document.getElementById("toggle").checked);
+            document.getElementById("toggle").onclick = async function() {
+                var checked = this.checked;
+                var sliderValue = document.getElementById('slider').value;
+                var scheme = document.getElementById("schemeFilter").options[document.getElementById("schemeFilter").selectedIndex].value;
+
+                if (checked) {
+                    var response = await fetch(`./uk_institutions_pct_${scheme}.json`);
+                    uk_data = await response.json();
+                    layout1['xaxis'] = {range: [0, 100]};
+
+                    var response = await fetch(`./lmic_institutions_pct_${scheme}.json`);
+                    lmic_data = await response.json();
+                    layout2['xaxis'] = {range: [0, 100]};
+                } else {
+                    var response = await fetch(`./uk_institutions_${scheme}.json`);
+                    uk_data = await response.json();
+                    layout1['xaxis'] = {range: [0, 100000]};
+
+                    var response = await fetch(`./lmic_institutions_${scheme}.json`);
+                    lmic_data = await response.json();
+                    layout2['xaxis'] = {range: [0, 40000]};
+                };
+                Plotly.react('barchart1', uk_data[sliderValue], layout1);
+                Plotly.react('barchart2', lmic_data[sliderValue], layout2);
+            }
+
+            document.getElementById("schemeFilter").onchange = async function () {
+                var scheme = this.options[this.selectedIndex].value;
+                var sliderValue = document.getElementById('slider').value;
+                var checked = document.getElementById("toggle").checked;
+
+                // UK and LMIC institutions
+                if (checked) {
+                    var response = await fetch(`./uk_institutions_pct_${scheme}.json`);
+                    uk_data = await response.json();
+
+                    var response = await fetch(`./lmic_institutions_pct_${scheme}.json`);
+                    lmic_data = await response.json();
+                } else {
+                    var response = await fetch(`./uk_institutions_${scheme}.json`);
+                    uk_data = await response.json();
+
+                    var response = await fetch(`./lmic_institutions_${scheme}.json`);
+                    lmic_data = await response.json();
+                };
+
+                // LMIC Wellcome authorships
+                var response = await fetch(`./lmic_wellcome_authorships_${scheme}.json`);
+                lmic_wellcome = await response.json();
+
+                // LMIC unique grant authorships
+                response = await fetch(`./lmic_grant_authorships_${scheme}.json`);
+                lmic_grant = await response.json();
+
+                // Grants with LMIC authorships
+                response = await fetch(`./grant_lmic_data_${scheme}.json`);
+                grant_lmic_data = await response.json();
+
+                Plotly.react('barchart1', uk_data[sliderValue], layout1);
+                Plotly.react('barchart2', lmic_data[sliderValue], layout2);
+                Plotly.react('barchart3', lmic_wellcome[sliderValue], layout3);
+                Plotly.react('barchart4', lmic_grant[sliderValue], layout4);
+                Plotly.react('barchart5', grant_lmic_data[sliderValue], layout5);
+            }
+
+            // UK institutions
+            var response = await fetch('./uk_institutions_All.json');
+            var uk_data = await response.json();
+
+            var layout1 = {
+                title: 'Co-authorships between UK and LMIC institutions (top 30)',
+                barmode: 'stack',
+                xaxis: {
+                    range: [0, 100000]
+                },
+                width: 1000,
+                height: 800,
+                margin: {
+                    l: 400,
+                },
+            };
+
+            document.getElementById('sliderValueDisplay').innerHTML = 2022;
+
+            Plotly.react('barchart1', uk_data['2022'], layout1);
+
+            // LMIC institutions
+            var response = await fetch('./lmic_institutions_All.json');
+            var lmic_data = await response.json();
+
+            var layout2 = Object.assign({}, layout1);
+            layout2['title'] = 'Coauthorships between LMIC and UK institutions (top 30)'
+            layout2['xaxis'] = {
+                    range: [0, 40000]
+                }
+
+            Plotly.react('barchart2', lmic_data['2022'], layout2);
+
+            // LMIC Wellcome authorships
+            var response = await fetch('./lmic_wellcome_authorships_All.json');
+            var lmic_wellcome = await response.json();
+
+            var layout3 = Object.assign({}, layout1);
+            layout3['title'] = 'Number of DR authorships per LMIC country (top 30) <br><sup>Of all the publications linked to DR grants, how many of their authors are based in each LMIC country?</sup>'
+            layout3['xaxis'] = {
+                    range: [0, 3000]
+                }
+
+            Plotly.react('barchart3', lmic_wellcome['2022'], layout3);
+
+            // LMIC unique grant authorships
+            var response = await fetch('./lmic_grant_authorships_All.json');
+            var lmic_grant = await response.json();
+
+            var layout4 = Object.assign({}, layout1);
+            layout4['title'] = 'Number of unique DR grants per LMIC country (top 30) <br><sup>How many unique DR grants can each LMIC country be linked back to, based on publication authorships?</sup>'
+            layout4['xaxis'] = {
+                    range: [0, 250]
+                }
+
+            Plotly.react('barchart4', lmic_grant['2022'], layout4);
+
+            // Grants with LMIC authorships
+            var response = await fetch('./grant_lmic_data_All.json');
+            var grant_lmic_data = await response.json();
+
+            var layout5 = Object.assign({}, layout1);
+            layout5['title'] = 'Number of LMIC authorships per grant (top 30) <br><sup>Looking at all the publications linked to each grant, how many authors are based in LMIC vs. other countries?</sup>'
+            layout5['xaxis'] = {
+                    range: [0,
+                    5000]
+                }
+
+            Plotly.react('barchart5', grant_lmic_data['2022'], layout5);
+
+        </script>
+    </body>
+</html>

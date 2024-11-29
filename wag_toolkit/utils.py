@@ -67,11 +67,11 @@ class Neo4j:
             session = self._driver.session(database=db)
             try:
                 if as_graph:
-                    graph = session.read_transaction(self._transaction, q, parameters)
+                    graph = session.execute_read(self._transaction, q, parameters)
                     self.nodes.extend(list(graph._nodes.values()))
                     self.edges.extend(list(graph._relationships.values()))
                 else:
-                    data = session.read_transaction(
+                    data = session.execute_read(
                         self._transaction, q, parameters, as_graph=False
                     )
                     if s3_path is not None:
