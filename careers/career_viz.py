@@ -238,7 +238,7 @@ def years_from_first_to_last_author_position_viz():
     """
     hist_values, hist_bins = Viz_calcs.years_from_first_to_last_author_position()
 
-    _, ax = plt.subplots(figsize=(16, 8))
+    _, ax = plt.subplots(figsize=(10, 6))
     for funder in Viz_calcs.funders:
         ax.plot((hist_bins[funder][:-1] + hist_bins[funder][1:])/2, hist_values[funder], label=funder)
 
@@ -273,7 +273,7 @@ def years_since_first_pub_viz():
     """
     hist_values, hist_bins = Viz_calcs.years_since_first_pub()
 
-    _, ax = plt.subplots(figsize=(16, 8))
+    _, ax = plt.subplots(figsize=(10, 6))
     for funder in Viz_calcs.funders:
         ax.plot((hist_bins[funder][:-1] + hist_bins[funder][1:])/2, hist_values[funder], label=funder)
 
@@ -415,4 +415,4 @@ if __name__ == "__main__":
     years_since_first_pub_viz()
     rep.add_figure(options="width = 70%") 
 
-    rep.write_report()
+    rep.write_report(template_path='simple.html')
