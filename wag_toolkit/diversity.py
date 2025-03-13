@@ -12,7 +12,7 @@ class IDR(Neo4j):
     def __init__(self, cypher_query=None, s3_path=None, weighted=None, graph=False):
         Neo4j.__init__(self, cypher_query, graph=False)
 
-        self.fields = pd.read_csv("./idr/input/anzsrc2020.csv")
+        self.fields = pd.read_csv('s3://datalabs-data/funding_impact_measures/fields_of_research/anzsrc2020.csv')
         self.fields["sub_group"] = self.fields["sub_group"].apply(lambda x: x.title())
         self.super_groups = list(
             self.fields["super_group"].apply(lambda x: x.title()).unique()
