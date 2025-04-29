@@ -21,13 +21,13 @@ classifiers = [
 ]
 
 dependencies = [
-    "awswrangler==3.5.2",
-    "neo4j==5.16.0",
-    "networkx==3.2.1",
-    "numpy==1.26.3",
-    "pandas==2.2.0",
-    "tqdm==4.66.3",
-    "cdindex==1.0.19"
+    "awswrangler>=3.5.2",
+    "neo4j>=5.16.0",
+    "networkx>=3.2.1",
+    "numpy>=1.26.3",
+    "pandas>=2.2.0",
+    "tqdm>=4.66.3",
+    "cdindex>=1.0.19"
 ]
 
 [project.urls]
