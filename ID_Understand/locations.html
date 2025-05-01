@@ -1,0 +1,246 @@
+<html>
+    <head>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src='https://cdn.plot.ly/plotly-2.27.0.min.js'></script>
+	<script src='https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js'></script>
+
+    <style type="text/css">
+        #mynetwork {
+            display: inline-block;
+
+            height: 1200px;
+            background-color: #ffffff;
+            border: 1px solid lightgray;
+            position: relative;
+        }
+    </style>
+</head>
+
+
+    <body>
+        <div style="position:fixed; z-index:100; background-color: white; width: 100%; top: 0;">
+            <label style="font-family:Helvetica">
+                Select year
+                <div class="slidecontainer">
+                    <input type="range" min="1999" max="2023" value="2022" class="slider" id="slider">
+                    Year: <span id="sliderValueDisplay"></span>
+                </div>
+            </label>
+            <br />
+            <br />
+            <!-- <label style="font-family:Helvetica">
+                Select scheme
+                <div>
+                    <label>
+                    <select id="nodeFilterSelect">
+                        <option value="all">All</option>
+                        <option value="Career Development Award">Career Development Award</option>
+                        <option value="Directed">Directed</option>
+                        <option value="Discovery Award">Discovery Award</option>
+                        <option value="Early-Career Award">Early Career Award</option>
+                        <option value="Off Strategy">Off Strategy</option>
+                        <option value="Other">Other</option>
+                        <option value="PhD">PhD</option>
+                    </select>
+                    </label>
+                </div>
+            </label> -->
+        </div>
+        <br />
+        <br />
+        <div style="height: 100px;"></div>
+        <div id="mynetwork"></div>
+        <br />
+        <br />
+        <div id="barchart"><!-- Plotly chart will be drawn inside this DIV --></div>
+
+
+        <script type="module">
+
+            function htmlTitle(html) {
+            const container = document.createElement("div");
+            container.innerHTML = html;
+            return container;
+            }
+
+            // Dropdown
+            const nodeFilterSelector = document.getElementById("nodeFilterSelect");
+            async function filterData() {
+                // var output = nodeFilterSelector.options[nodeFilterSelector.selectedIndex].value;
+                var_output = 'all';
+                
+                // Load nodes data
+                var nodesFname = './nodes_'+output+'.json';
+                console.log(nodesFname);
+                nodesData = await loadNodesData(nodesFname);
+                nodes.update(nodesData[sliderValue]);
+
+                // Load edges data
+                var edgesFname = './dict_edges_'+output+'.json';
+                edgesData = await loadEdgesData(edgesFname);
+                edges.clear();
+                edges.update(edgesData[sliderValue]);
+
+                Plotly.purge('barchart');
+
+            }
+
+            // nodeFilterSelector.onchange = filterData
+            filterData();
+
+            // Load global options
+            var response = await fetch('./options.json');
+            var options = await response.json();
+
+            // Load node positions
+            var response = await fetch('./positions.json');
+            var positions = await response.json();
+
+            // Load nodes data
+            async function loadNodesData(fname) {
+                var response = await fetch(fname);
+                var nd = await response.json();
+                // Format title
+                for (const [year, data] of Object.entries(nd)) {
+                    for (let i = 0; i < data.length; i++) {
+                        const newTitle = htmlTitle(data[i].title)
+                        data[i].title = newTitle;
+                        };
+                    };
+                // create an array with nodes
+                if (Object.keys(positions).length > 0) {
+                    for (const year in nd) {
+                        for (let i = 0; i < nd[year].length; i++) {
+                            nd[year][i].x = positions[nd[year][i].label].x;
+                            nd[year][i].y = positions[nd[year][i].label].y;
+                        }
+                    };
+                    options.physics.enabled = false;
+                };
+                return nd;
+            }
+
+            var nodesData = await loadNodesData('./nodes_all.json');
+
+            // Load edges data
+            async function loadEdgesData(fname) {
+                var response = await fetch(fname);
+                return await response.json();
+            }
+
+            var edgesData = await loadEdgesData('./dict_edges_all.json');
+
+            // Initialise an array with nodes
+            var nodes = new vis.DataSet(nodesData['2022']);
+
+            // create an array with edges
+            var edges = new vis.DataSet(edgesData['2022']);
+
+            // Create variable for sliderValue, set to initial value
+            // Update HTML slider and display with initial value
+            var sliderValue = 2022;
+            document.getElementById('slider').value = sliderValue;
+            document.getElementById('sliderValueDisplay').innerHTML = sliderValue;
+
+            // Create a DataView which is a filtered version of the DataSet
+            var edgesView = new vis.DataView(edges);
+            var nodesView = new vis.DataView(nodes);
+
+            // create a network
+            var container = document.getElementById("mynetwork");
+            var data = {
+            nodes: nodesView,
+            // Set edges to DataView which is filtered, rather than the DataSet
+            edges: edgesView,
+            };
+
+            var network = new vis.Network(container, data, options);
+
+            let clickedNodeId = null;
+
+            function plotBarChart(selectedNode, edgesToPlot) {
+                var connectedNodes = Array();
+                var data = [
+                    {
+                        x: Array(),
+                        y: Array(),
+                        type: 'bar',
+                        marker: {
+                            color: 'rgb(50,115,246,0.8)'
+                        }
+                    }
+                ];
+
+                for (let i = 0; i < edgesToPlot.length; i++) {
+                    connectedNodes[i] = {};
+                    connectedNodes[i]['y'] = edgesToPlot[i]['weight'];
+                    if (edgesToPlot[i]['from']===selectedNode) {
+                        connectedNodes[i]['x'] = edgesToPlot[i]['to'];
+                    } else {
+                        connectedNodes[i]['x'] = edgesToPlot[i]['from'];
+                    }
+                }
+
+                var top30 = connectedNodes.sort(function(a, b) {
+                    return b.y - a.y;
+                }).slice(0,30);
+                data[0]['x'] = [...top30.map(n => n['x'])];
+                data[0]['y'] = [...top30.map(n => n['y'])];
+
+                Plotly.react('barchart', data);
+            }
+
+            function doubleClickSelect(params) {
+                if (params.nodes.length > 0) {
+                    clickedNodeId = params.nodes[0];
+
+                    // Filter edges based on the clicked node
+                    const connectedEdges = edges.get({
+                        filter: function (edge) {
+                            return edge.from === clickedNodeId || edge.to === clickedNodeId;
+                        }
+                    });
+                    edges.clear();
+                    edges.update(connectedEdges);
+                    plotBarChart(clickedNodeId, connectedEdges);
+                }
+            }
+
+            network.on("doubleClick", doubleClickSelect);
+
+            network.on("click", function (params) {
+                edges.clear();
+                edges.update(edgesData[sliderValue]);
+                clickedNodeId = null;
+                Plotly.purge('barchart');
+                }
+            );
+
+            // Handler event when slider changes
+            document.getElementById('slider').oninput = function() {
+                // Get the value of the slider and store it
+                sliderValue = this.value;
+
+                // Refresh the data view so the update to sliderValue takes affect
+                if (clickedNodeId !== null) {
+                    var updatedEdges = edgesData[sliderValue].filter(edge => edge['to'] === clickedNodeId || edge['from'] === clickedNodeId);
+                    plotBarChart(clickedNodeId, updatedEdges);
+                } else {
+                    var updatedEdges = edgesData[sliderValue];
+                }
+
+                edges.clear();
+                edges.update(updatedEdges);
+
+                // Update nodes
+                nodes.update(nodesData[sliderValue]);
+
+                // Display the selected value next to slider
+                document.getElementById('sliderValueDisplay').innerHTML = sliderValue;
+
+            }
+
+
+        </script>
+    </body>
+</html>
