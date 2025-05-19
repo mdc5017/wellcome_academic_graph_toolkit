@@ -166,3 +166,6 @@ data/
 .DS_Store
 idr/reports/*
 idr/vis/*
+geographies/files/*
+ID_All_Countries/*
+ID_LMIC_Countries/*
